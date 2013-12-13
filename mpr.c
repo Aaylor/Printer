@@ -9,158 +9,86 @@
 #include <sys/stat.h>
 
 #include "error.h"
+#include "message.h"
 #include "mpr.h"
 
 static char type = 'i';
 static char answer_tube[64];
-
-void 
-create_random_tube_name(char *seed)
-{
-    int left;
-    size_t current_length;
-
-    left = 54;
-    strcpy(answer_tube, "/tmp/tAsw_");
-    current_length = strlen(answer_tube);
-
-    while (*seed && left > 23)
-    {
-        if (!isalnum(*seed))
-        {
-            seed += 1;
-            continue;
-        }
-
-        if (rand() % 2 == 0)
-            answer_tube[current_length++] = toupper(*seed);
-        else
-            answer_tube[current_length++] = tolower(*seed);
-        seed += 3;
-        answer_tube[current_length] = '\0';
-        --left;
-    }
-
-    while (left-- > 1)
-        answer_tube[current_length++] = (rand() % 10) + '0';
-    answer_tube[current_length] = '\0';
-}
 
 char *
 to_abs_ref(char *reference)
 {
     if (*reference == '/')
         return reference;
+    return reference;
 }
 
-char *
-create_message(const char * const imp_name, const char * const filename)
+void *
+write_message(const char * const imp_name, const char * const filename)
 {
-    int length_imp, length_filename, length_answer_tube;
-    char *message;
-    unsigned int message_size;
-    uid_t uid;
-    gid_t gid;
-    size_t pos;
+    struct sending_message msg;
+    size_t imp_length, filename_length, pos, buf_size;
+    char *buf, *returned_message;
 
-    uid = getuid();
-    gid = getgid();
+    imp_length = strlen(imp_name);
+    filename_length = strlen(filename);
+    buf_size = (imp_length + filename_length) + (2 * sizeof(size_t));
 
-    length_imp = strlen(imp_name);
-    length_filename = strlen(filename);
-    length_answer_tube = strlen(answer_tube);
-
-    message_size = sizeof(unsigned int) + sizeof(char) + sizeof(uid_t) + sizeof(gid_t)
-        + (3 * sizeof(int)) + length_imp + length_filename + length_answer_tube + 3;
-
-    message = malloc(message_size);
+    buf = malloc(buf_size);
+    if (buf == NULL)
+        ERROR_EXIT(11234);
 
     pos = 0;
-    memcpy(message, &message_size, sizeof(unsigned int));
 
-    pos += sizeof(unsigned int);
-    memcpy(message + pos, &type, sizeof(char));
+    memcpy(buf, &imp_length, sizeof(size_t));
+    pos += sizeof(size_t);
 
-    pos += sizeof(char);
-    memcpy(message + pos, &uid, sizeof(uid_t));
+    memcpy(buf + pos, imp_name, imp_length);
+    pos += imp_length;
 
-    pos += sizeof(uid_t);
-    memcpy(message + pos, &gid, sizeof(gid_t));
+    memcpy(buf + pos, &filename_length, sizeof(size_t));
+    pos += sizeof(size_t);
 
-    pos += sizeof(gid_t);
-    memcpy(message + pos, &length_imp, sizeof(int));
-    
-    pos += sizeof(int);
-    memcpy(message + pos, imp_name, length_imp);
+    memcpy(buf + pos, filename, filename_length);
+    pos += filename_length;
 
-    pos += length_imp;
-    memcpy(message + pos, &length_filename, sizeof(int));
+    msg.type = type;
+    msg.uid = getuid();
+    msg.gid = getgid();
+    msg.answering_tube = answer_tube;
+    msg.buf_size = buf_size;
+    msg.buf = buf;
 
-    pos += sizeof(int);
-    memcpy(message + pos, filename, length_filename);
+    returned_message = create_message(msg); 
 
-    pos += length_filename;
-    memcpy(message + pos, &length_answer_tube, sizeof(int));
-    
-    pos += sizeof(int);
-    memcpy(message + pos, answer_tube, length_answer_tube);
-   
-    return message;
+    free(buf);
+
+    return returned_message;
 }
 
 void 
-send_message(const char * const tube, const char * const message)
+handle_answer(void)
 {
-    int fd;
-    unsigned int size;
+    int answer;
 
-    memcpy(&size, message, sizeof(unsigned int));
-
-    fd = open(tube, O_WRONLY);
-    if (fd == -1)
-        ERROR_EXIT(10);   
-
-    write(fd, message, size);
-    unlink(tube);
-    close(fd);
-}
-
-void 
-get_answer(void)
-{
-    int fd, answer;
-    size_t b_read;
-
-    if (mkfifo(answer_tube, S_IRWXU | S_IRWXG | S_IRWXO) == -1)
-        ERROR_EXIT(11);
-
-    fd = open(answer_tube, O_RDONLY);
-    if (fd == -1)
-        ERROR_EXIT(10);
-
-    while((b_read = read(fd, &answer, sizeof(int))) > 0);
-
-    switch(answer)
+    switch((answer = get_answer(answer_tube)))
     {
-        case -1:
-            printf("ERROR ON READ ANSWER....\n");
+        case -1 :
+            printf("Error.");
             break;
         default:
-            printf("Id impression : %d\n", answer);
+            printf("ID : %d\n", answer);
             break;
     }
-
-    unlink(answer_tube);
-    close(fd);
 }
 
-
-
 int 
-main(int argc, const char **argv)
+main(int argc, char **argv)
 {
     int cpt, imp_set, file_set;
-    char *imprimante, *file, *message, *server_tube;
+    char *imprimante, *file, *server_tube;
+    void *message;
+    struct stat s;
 
     srand(time(NULL));
 
@@ -169,7 +97,7 @@ main(int argc, const char **argv)
 
     server_tube = getenv("IMP_PATH");
     if (server_tube == NULL)
-        ERROR_MSG(12, "IMP_PATH n'existe pas...%s", "");
+        ERROR_MSG(12, "IMP_PATH n'existe pas...%s\n", "");
 
     imp_set = 0;
     file_set = 0;
@@ -180,10 +108,9 @@ main(int argc, const char **argv)
         {
             if ((cpt + 1 < argc) && (imp_set == 0))
             {
-                if ((imprimante = malloc((strlen(argv[cpt + 1]) + 1) * sizeof(char))) == NULL)
-                    ERROR_EXIT(1);
-                strcpy(imprimante, argv[cpt + 1]);
                 ++cpt;
+                imprimante = argv[cpt];
+                imp_set = 1;
             }
             else
                 ARG_ERROR_EXIT(3, USAGE);
@@ -193,17 +120,21 @@ main(int argc, const char **argv)
             if (file_set == 1)
                 ARG_ERROR_EXIT(3, USAGE);
 
-            if ((file = malloc((strlen(argv[cpt]) + 1) * sizeof(char))) == NULL)
-                ERROR_EXIT(1);
-            strcpy(file, argv[cpt]);
+            file = argv[cpt];
+            file_set = 1;
         }
         ++cpt;
     }
 
-    create_random_tube_name(file);
-    message = create_message(imprimante, file);
+    if (stat(file, &s) == -1)
+        ERROR_EXIT(10);
+    if (!S_ISREG(s.st_mode))
+        ERROR_MSG(11, "Le fichier n'est pas régulier...\n%s", "");
+
+    create_random_tube_name(answer_tube, file);
+    message = write_message(imprimante, file);
     send_message(server_tube, message);
-    get_answer();
+    handle_answer();
 
     return EXIT_SUCCESS;
 }
