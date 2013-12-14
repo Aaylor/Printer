@@ -7,6 +7,7 @@ all: message.o cancel_impress init_simulateurs mpr print_demon \
 	 sim_impress wait_impress clean
 
 mpr: message.h message.o
+cancel_impress: message.h message.o
 
 %: %.o
 	$(CC) -o $(BIN)$@ $^

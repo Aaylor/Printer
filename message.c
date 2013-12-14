@@ -46,6 +46,12 @@ create_random_tube_name(char tube[64], char *seed)
     tube[current_length] = '\0';
 }
 
+int
+create_tube(const char *name)
+{
+    return mkfifo(name, S_IRWXU | S_IRWXG | S_IRWXO);
+}
+
 void *
 create_message(struct sending_message m)
 {

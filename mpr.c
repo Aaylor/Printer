@@ -12,6 +12,11 @@
 #include "message.h"
 #include "mpr.h"
 
+/*
+ * OUVRIR LE TUBE DE REPONSE DES LE DEPART.
+ */
+
+
 static char type = 'i';
 static char answer_tube[64];
 
