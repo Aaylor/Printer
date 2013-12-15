@@ -1,13 +1,14 @@
 CC=gcc
-CFLAGS=-Wall -pedantic -std=c99 -D _POSIX_C_SOURCE=200112L
+CFLAGS=-g -Wall -pedantic -std=c99 -D _POSIX_C_SOURCE=200112L
 EXEC=
 BIN=
 
-all: message.o cancel_impress init_simulateurs mpr print_demon \
+all: message.o queue.o cancel_impress init_simulateurs mpr print_demon \
 	 sim_impress wait_impress clean
 
 mpr: message.h message.o
 cancel_impress: message.h message.o
+print_demon: queue.h queue.o
 
 %: %.o
 	$(CC) -o $(BIN)$@ $^

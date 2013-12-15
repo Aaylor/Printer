@@ -137,6 +137,9 @@ main(int argc, char **argv)
         ERROR_MSG(11, "Le fichier n'est pas régulier...\n%s", "");
 
     create_random_tube_name(answer_tube, file);
+    if (mkfifo(answer_tube, S_IRWXU | S_IRWXG | S_IRWXO) == -1)
+        ERROR_EXIT(11);
+    
     message = write_message(imprimante, file);
     send_message(server_tube, message);
     handle_answer();

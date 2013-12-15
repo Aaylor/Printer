@@ -2,6 +2,7 @@
 #define PRINT_DEMON_H
 
 #include "error.h"
+#include "queue.h"
 
 enum __error_type_print_demon{
     MORE_THAN_ONCE,
@@ -22,6 +23,31 @@ typedef enum __error_type_print_demon daemon_error_t;
 #define ERROR_OPT(__error_t, c) \
     ERROR_MSG((__error_t), __ERROR_MSG((__error_t)), (c))
 
+typedef struct queue printers_list;
+typedef struct queue waiting_list;
+
+typedef struct node *printer;
+typedef struct node *waiting;
+
+struct printer
+{
+    const char *name;
+    int fd_printer;
+    int fd_current_file;
+    waiting_list wl;
+};
+
+struct waiting
+{
+    char *filename;
+    int id;
+};
+
+#define add_in_printer_list(q, d) add_in_queue((q), (d))
+#define add_in_waiting_list(q, d) add_in_queue((q), (d))
+
+void
+write_answer(const char *, int);
 
 #endif /* endif PRINT_DEMON_H */
 

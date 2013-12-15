@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 
 #include "error.h"
+#include "constants.h"
 #include "sim_impress.h"
 
 struct imprimante_info infos;
@@ -41,27 +42,32 @@ work(void)
 {
     int fd_reading, fd_writing;
     size_t bytes_read, total_read;
-    char buffer[IMP_BUFFER];
+    char buffer[BUFFER_SIZE];
 
     fd_reading = open(infos.tube_name, O_RDONLY);
     if (fd_reading == -1)
         ERROR_EXIT(124);
 
-    fd_writing = open("/home/aaylor/testfile", O_WRONLY);
+    fd_writing = open("/dev/null", O_WRONLY);
     if (fd_writing == -1)
         ERROR_EXIT(4567);
 
     total_read = 0;
-    while((bytes_read = read(fd_reading, buffer, IMP_BUFFER)) > 0)
+    while((bytes_read = read(fd_reading, buffer, BUFFER_SIZE)) > 0)
     {
+        printf("bytes_read : %d\n", bytes_read);
+
         if (has_eof(buffer, bytes_read) == 0)
         {
             write(fd_writing, buffer, (bytes_read - 10));
             total_read += (bytes_read - 10);
+            printf("END OF WRITING\n");
             sleep((total_read/10000));
+            printf("END OF SLEEPING\n\n");
         }
         else
         {
+            printf("WRITING\n");
             write(fd_writing, buffer, bytes_read);
             total_read += bytes_read;
         }

@@ -101,13 +101,12 @@ send_message(const char * const tube, const void * const message)
 
     memcpy(&size, message, sizeof(unsigned int));
 
-    fd = open(tube, O_WRONLY | O_NONBLOCK);
+    fd = open(tube, O_WRONLY);
     if (fd == -1)
         ERROR_EXIT(10);   
     
     write(fd, message, (size + sizeof(unsigned int)));
     
-    unlink(tube);
     close(fd);
 }
 
@@ -122,10 +121,6 @@ get_answer(const char * const answer_tube)
 {
     int fd, answer;
     size_t bytes_read;
-
-
-    if (mkfifo(answer_tube, S_IRWXU | S_IRWXG | S_IRWXO) == -1)
-        ERROR_EXIT(11);
 
     fd = open(answer_tube, O_RDONLY);
     if (fd == -1)
