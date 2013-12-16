@@ -31,5 +31,20 @@
     } while (0)
 #endif /* endif ERROR_MSG  */
 
+
+enum printing
+{
+    DONT_HAVE_RIGHTS = -1,
+    UNKNOWN_PRINTER_NAME = -2, 
+};
+
+enum canceling
+{
+    REMOVED,
+    UNKNOWN_ID,
+    DONT_HAVE_ACCESS,
+};
+
+
 #endif /* endif ERROR_H */
 

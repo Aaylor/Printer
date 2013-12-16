@@ -26,20 +26,23 @@ typedef enum __error_type_print_demon daemon_error_t;
 typedef struct queue printers_list;
 typedef struct queue waiting_list;
 
-typedef struct node *printer;
-typedef struct node *waiting;
+typedef struct node *node;
 
 struct printer
 {
-    const char *name;
+    char stopped;
     int fd_printer;
     int fd_current_file;
+    int id_print;
+    uid_t uid_user;
+    const char *name;
     waiting_list wl;
 };
 
 struct waiting
 {
     char *filename;
+    uid_t uid_user;
     int id;
 };
 
@@ -47,7 +50,7 @@ struct waiting
 #define add_in_waiting_list(q, d) add_in_queue((q), (d))
 
 void
-write_answer(const char *, int);
+write_answer(const char *, void *, size_t);
 
 #endif /* endif PRINT_DEMON_H */
 

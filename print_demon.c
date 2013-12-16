@@ -9,6 +9,7 @@
 
 #include "constants.h"
 #include "error.h"
+#include "message.h"
 #include "print_demon.h"
 
 static const char *receiving_tube;
@@ -46,10 +47,10 @@ add_printer(const char *name, const char *tube)
 }
 
 int
-send_to_printer(const char *printer_name, const char *filename)
+send_to_printer(const char *printer_name, const char *filename, uid_t uid_user)
 {
     struct waiting *w;
-    printer p = p_list.head;
+    node p = p_list.head;
 
     while(p != NULL)
     {
@@ -59,6 +60,7 @@ send_to_printer(const char *printer_name, const char *filename)
             w = malloc(sizeof(struct waiting));
             w->filename = malloc(strlen(filename) + 1);
             strcpy(w->filename, filename);
+            w->uid_user = uid_user;
             w->id = print_id;
 
             add_in_waiting_list(&(cur_printer->wl), w);
@@ -68,7 +70,7 @@ send_to_printer(const char *printer_name, const char *filename)
         p = p->next;
     }
 
-    return 0;
+    return UNKNOWN_PRINTER_NAME;
 }
 
 int
@@ -121,17 +123,62 @@ try_rights_on_file(uid_t uid, gid_t gid, const char *filename)
     return 1;
 }
 
+int
+check_if_id_exist(int id, uid_t uid)
+{
+    /*
+     * si id > à l'id courant, alors pas la peine de continuer.
+     */
+    node p_node, w_node;
+    struct printer *c_printer;
+    struct waiting *w;
+
+    for (p_node = p_list.head; p_node != NULL; p_node = p_node->next)
+    {
+        c_printer = (struct printer *)(p_node->data); 
+        if (c_printer->id_print == id)
+        {
+            if (c_printer->uid_user != uid)
+                return DONT_HAVE_ACCESS;
+
+            c_printer->stopped = 1;
+            return REMOVED;
+        }
+
+        for(w_node = (c_printer->wl).head; w_node != NULL; w_node = w_node->next)
+        {
+            w = (struct waiting *)(w_node->data);
+
+            if (w->id == id)
+            {
+                if (w->uid_user != uid)
+                    return DONT_HAVE_ACCESS;
+
+                if(remove_node(&(c_printer->wl), w_node) == NULL)
+                    return UNKNOWN_ID;
+
+                free(w->filename);
+                free(w);
+
+                return REMOVED;
+            }
+        }
+    }
+
+    return UNKNOWN_ID;
+}
+
 void process_msg(char *buf)
 {
     int id;
     char type;
     uid_t uid;
     gid_t gid;
-    size_t length_answer_tube, pos;
-    char *answering_tube;
+    size_t pos;
+    char answering_tube[ANSWERING_TUBE_SIZE];
     
     pos = 0;
-    memcpy(&type, buf + pos, sizeof(char));
+    type = *buf;
     pos += sizeof(char);
 
     memcpy(&uid, buf + pos, sizeof(uid_t));
@@ -140,54 +187,59 @@ void process_msg(char *buf)
     memcpy(&gid, buf + pos, sizeof(gid_t));
     pos += sizeof(gid_t);
 
-    memcpy(&length_answer_tube, buf + pos, sizeof(size_t));
-    pos += sizeof(size_t);
-
-    answering_tube = malloc(length_answer_tube + 1);
-    if (answering_tube == NULL)
-        ERROR_EXIT(56789);
-    memcpy(answering_tube, buf + pos, length_answer_tube);
-    answering_tube[length_answer_tube] = '\0';
-    pos += length_answer_tube;
+    memcpy(answering_tube, buf + pos, ANSWERING_TUBE_SIZE);
+    pos += ANSWERING_TUBE_SIZE;
 
     if (type == 'i')
     {
         char *printer_name, *filename;
-        size_t length_printer_name, length_filename;
+        int answer;
+        size_t printer_name_length, filename_length; 
 
-        memcpy(&length_printer_name, buf + pos, sizeof(size_t));
-        pos += sizeof(size_t);
+        printer_name_length = strlen(buf + pos);
+        printer_name = malloc(printer_name_length + 1);
+        memcpy(printer_name, buf + pos, printer_name_length + 1);
+        pos += printer_name_length + 1;
 
-        printer_name = malloc(length_printer_name + 1);
-        memcpy(printer_name, buf + pos, length_printer_name);
-        printer_name[length_printer_name] = '\0';
-        pos += length_printer_name;
+        filename_length = strlen(buf + pos);
+        filename = malloc(filename_length + 1);
+        memcpy(filename, buf+pos, filename_length + 1);
+        pos +=filename_length + 1;
 
-        memcpy(&length_filename, buf + pos, sizeof(size_t));
-        pos += sizeof(size_t);
+        printf("filename : %s\nprintername : %s\n", filename, printer_name);
 
-        filename = malloc(length_filename + 1);
-        memcpy(filename, buf+pos, length_filename);
-        filename[length_filename] = '\0';
-        pos +=length_filename;
-
-        if (try_rights_on_file(uid, gid, filename) != 0)
-            write_answer(answering_tube, NO_RIGHTS); 
+        if ((answer = try_rights_on_file(uid, gid, filename)) == DONT_HAVE_RIGHTS)
+            write_answer(answering_tube, &answer, sizeof(int)); 
         else
         {
-            if ((id = send_to_printer(printer_name, filename)) == 0)
-                write_answer(answering_tube, UNKNOWN_PRINTER_NAME);
+            if ((answer = send_to_printer(printer_name, filename, uid)) == UNKNOWN_PRINTER_NAME)
+                write_answer(answering_tube, &answer, sizeof(int));
             else
-                write_answer(answering_tube, id);
+                write_answer(answering_tube, &answer, sizeof(int));
         }
 
+    }
+    else if (type == 'c')
+    {
+        int id, answer;
+        
+        memcpy(&id, buf+pos, sizeof(int));
+        answer = check_if_id_exist(id, uid);
+
+        write_answer(answering_tube, &answer, sizeof(int));
+    }
+    else if (type == 'l')
+    {
+        /* 
+         * LIST
+         */
     }
     else
         printf("NOT NOW\n");
 }
 
 void
-write_answer(const char *tube, int answer)
+write_answer(const char *tube, void *answer, size_t size)
 {
     int fd;
 
@@ -195,7 +247,7 @@ write_answer(const char *tube, int answer)
     if (fd == -1)
         ERROR_EXIT(45678);
 
-    write(fd, &answer, sizeof(int));
+    write(fd, answer, size);
 
     close(fd);
 }
@@ -224,6 +276,7 @@ void work()
             msg_length = 0;
         }
 
+#ifndef DEBUG
         for (p = p_list.head; p != NULL; p = p->next)
         {
             size_t bytes_read_in_file = 0;
@@ -237,12 +290,14 @@ void work()
                 printf("fd print : %d\n", current_printer->fd_printer);
                 printf("fd cf : %d\n", current_printer->fd_current_file);
                 bytes_read_in_file = read(current_printer->fd_current_file, print_buffer, BUFFER_SIZE);
-                if (bytes_read_in_file == 0)
+                if (bytes_read_in_file == 0 || current_printer->stopped == 1)
                 {
                     write(current_printer->fd_printer, END_OF_PRINT, 10);
                     close(current_printer->fd_current_file);
+                    current_printer->uid_user = -1;
                     current_printer->fd_current_file = -2;
-
+                    current_printer->id_print = 0;
+                    current_printer->stopped = 0;
                 }
                 else
                     write(current_printer->fd_printer, print_buffer, bytes_read_in_file);
@@ -254,16 +309,21 @@ void work()
                     struct waiting *current_data;
                     current_data = (struct waiting *)(pop(&(current_printer->wl))->data);
 
+                    current_printer->stopped = 0;
+                    current_printer->uid_user = current_data->uid_user;
+                    current_printer->id_print = current_data->id;
                     current_printer->fd_current_file = open(current_data->filename, O_RDONLY);
                     if (current_printer->fd_current_file == -1)
                     {
                         perror("opening...\n");
                         current_printer->fd_current_file = -2;
                     }
+
+                    free(current_data->filename);
                 }
             }
         }
-
+#endif
         sleep(1);
     }
 }
@@ -312,7 +372,9 @@ main(int argc, char **argv)
     
 
     printf("TUBE : %s\nCONF : %s\n", receiving_tube, config_file);
+#ifndef DEBUG
     init_config_file();
+#endif
     work();
 
 

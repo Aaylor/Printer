@@ -78,6 +78,30 @@ pop(struct queue *q)
     return tmp;
 }
 
+struct node *
+remove_node(struct queue *q, struct node *n)
+{
+    struct node *tmp;
+
+    if (q->length == 0)
+        return NULL;
+
+    for(tmp = q->head; tmp != NULL; tmp = tmp->next)
+    {
+        if (tmp == n)
+        {
+            if (tmp->prev != NULL)
+                tmp->prev->next = tmp->next;
+            if (tmp->next != NULL)
+                tmp->next->prev = tmp->prev;
+
+            return tmp;
+        }
+    }
+
+    return NULL;
+}
+
 /*
  * TEMP
  */

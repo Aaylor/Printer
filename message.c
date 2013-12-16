@@ -55,14 +55,12 @@ create_tube(const char *name)
 void *
 create_message(struct sending_message m)
 {
-    unsigned int msg_length;
-    size_t pos, length;
     char *buf;
-
-    length = strlen(m.answering_tube);
+    size_t pos, length;
+    unsigned int msg_length;
 
     msg_length = sizeof(char) + sizeof(uid_t) + sizeof(gid_t) + sizeof(size_t)
-        + length + m.buf_size;
+        + ANSWERING_TUBE_SIZE + m.buf_size;
 
     buf = malloc(msg_length);
     if (buf == NULL)
@@ -81,11 +79,8 @@ create_message(struct sending_message m)
     memcpy(buf + pos, &(m.gid), sizeof(gid_t));
     pos += sizeof(gid_t);
 
-    memcpy(buf + pos, &length, sizeof(size_t));
-    pos += sizeof(size_t);
-
-    memcpy(buf + pos, m.answering_tube, length);
-    pos += length;
+    memcpy(buf + pos, m.answering_tube, ANSWERING_TUBE_SIZE);
+    pos += ANSWERING_TUBE_SIZE;
 
     memcpy(buf + pos, m.buf, m.buf_size);
     pos += m.buf_size;

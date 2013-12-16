@@ -35,24 +35,17 @@ write_message(const char * const imp_name, const char * const filename)
     size_t imp_length, filename_length, pos, buf_size;
     char *buf, *returned_message;
 
-    imp_length = strlen(imp_name);
-    filename_length = strlen(filename);
-    buf_size = (imp_length + filename_length) + (2 * sizeof(size_t));
+    imp_length = strlen(imp_name) + 1;
+    filename_length = strlen(filename) + 1;
+    buf_size = (imp_length + filename_length);
 
     buf = malloc(buf_size);
     if (buf == NULL)
         ERROR_EXIT(11234);
 
     pos = 0;
-
-    memcpy(buf, &imp_length, sizeof(size_t));
-    pos += sizeof(size_t);
-
     memcpy(buf + pos, imp_name, imp_length);
     pos += imp_length;
-
-    memcpy(buf + pos, &filename_length, sizeof(size_t));
-    pos += sizeof(size_t);
 
     memcpy(buf + pos, filename, filename_length);
     pos += filename_length;
@@ -60,7 +53,7 @@ write_message(const char * const imp_name, const char * const filename)
     msg.type = type;
     msg.uid = getuid();
     msg.gid = getgid();
-    msg.answering_tube = answer_tube;
+    strcpy(msg.answering_tube, answer_tube);
     msg.buf_size = buf_size;
     msg.buf = buf;
 
@@ -74,16 +67,23 @@ write_message(const char * const imp_name, const char * const filename)
 void 
 handle_answer(void)
 {
-    int answer;
-
-    switch((answer = get_answer(answer_tube)))
+    if (type == 'i')
     {
-        case -1 :
-            printf("Error.");
-            break;
-        default:
-            printf("ID : %d\n", answer);
-            break;
+        int answer;
+
+        switch((answer = get_answer(answer_tube)))
+        {
+            case DONT_HAVE_RIGHTS:
+                fprintf(stderr, "Vous n'avez pas les droits requis.\n");
+                break;
+            case UNKNOWN_PRINTER_NAME:
+                fprintf(stderr, "L'imprimante demandée n'existe pas.\n");
+                break;
+            default:
+                printf("La demande a été acceptée.\n"
+                        "ID impression : %d\n", answer);
+                break;
+        }
     }
 }
 
@@ -139,7 +139,7 @@ main(int argc, char **argv)
     create_random_tube_name(answer_tube, file);
     if (mkfifo(answer_tube, S_IRWXU | S_IRWXG | S_IRWXO) == -1)
         ERROR_EXIT(11);
-    
+   
     message = write_message(imprimante, file);
     send_message(server_tube, message);
     handle_answer();

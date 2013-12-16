@@ -3,23 +3,19 @@
 
 #include <sys/types.h>
 
+#define ANSWERING_TUBE_SIZE     64
+#define CONSTANT_SIZE_REQUEST   \
+    (sizeof(char) + sizeof(uid_t) + sizeof(gid_t) + ANSWERING_TUBE_SIZE)
+
 struct sending_message
 {
     char type;
     uid_t uid;
     gid_t gid;
-    char *answering_tube;
+    char answering_tube[ANSWERING_TUBE_SIZE];
     size_t buf_size;
     void *buf;
 };
-
-struct answering_message
-{
-    unsigned int length;
-    char type;
-    void *buf;
-};
-
 
 void
 create_random_tube_name(char[64], char *);

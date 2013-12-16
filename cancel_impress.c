@@ -7,6 +7,8 @@
 #include "error.h"
 #include "message.h"
 
+#if 0
+
 static char type = 'a';
 static char answering_tube[64];
 
@@ -59,10 +61,12 @@ handle_answer(void)
             break;
     }
 }
+#endif
 
 int 
 main(int argc, char **argv)
 {
+#if 0
     int id, cpt;
     void *message;
     char *server_tube;
@@ -83,6 +87,7 @@ main(int argc, char **argv)
     message = write_message(id);
     send_message(server_tube, message);
     handle_answer();
-
+#endif
     return EXIT_SUCCESS;
 }
+

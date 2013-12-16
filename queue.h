@@ -29,6 +29,9 @@ add_in_queue(struct queue *, void *);
 struct node *
 pop(struct queue *);
 
+    struct node *
+remove_node(struct queue *q, struct node *n);
+
 void 
 print_queue(struct queue);
 
