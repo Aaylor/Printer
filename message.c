@@ -62,7 +62,6 @@ create_message(struct sending_message m)
     size_t pos, length;
     unsigned int msg_length;
 
-    printf("%d\n", m.buf_size);
     msg_length = sizeof(char) + sizeof(uid_t) + sizeof(gid_t)
         + ANSWERING_TUBE_SIZE + m.buf_size;
 
@@ -88,7 +87,6 @@ create_message(struct sending_message m)
 
     if (m.buf_size != 0)
     {
-        printf("buffer not empty\n");
         memcpy(buf + pos, m.buf, m.buf_size);
         pos += m.buf_size;
     }
