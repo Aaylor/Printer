@@ -32,10 +32,14 @@ struct printer
 {
     char stopped;
     int fd_printer;
+    const char *name;
+    const char *tube_path;
+    
     int fd_current_file;
     int id_print;
     uid_t uid_user;
-    const char *name;
+    char *filename;
+    
     waiting_list wl;
 };
 
@@ -51,6 +55,9 @@ struct waiting
 
 void
 write_answer(const char *, void *, size_t);
+
+void
+write_list(const char *, const char *);
 
 #endif /* endif PRINT_DEMON_H */
 

@@ -81,15 +81,22 @@ pop(struct queue *q)
 struct node *
 remove_node(struct queue *q, struct node *n)
 {
+    int pos;
     struct node *tmp;
 
     if (q->length == 0)
         return NULL;
 
-    for(tmp = q->head; tmp != NULL; tmp = tmp->next)
+    for(tmp = q->head, pos = 0; tmp != NULL; tmp = tmp->next, pos++)
     {
         if (tmp == n)
         {
+            if (pos == 0)
+            {
+                q->head = tmp->next;
+                q->length--;
+            }
+
             if (tmp->prev != NULL)
                 tmp->prev->next = tmp->next;
             if (tmp->next != NULL)

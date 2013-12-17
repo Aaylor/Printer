@@ -20,6 +20,9 @@ struct sending_message
 void
 create_random_tube_name(char[64], char *);
 
+int
+create_tube(const char *);
+
 void *
 create_message(struct sending_message);
 
@@ -28,6 +31,9 @@ send_message(const char * const, const void* const);
 
 int
 get_answer(const char * const);
+
+void
+print_answer(char[ANSWERING_TUBE_SIZE]);
 
 #endif /* end of include guard: MESSAGE_H */
 

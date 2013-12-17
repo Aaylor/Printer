@@ -1,31 +1,69 @@
 #include <ctype.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 
 #include "constants.h"
 #include "error.h"
 #include "message.h"
 #include "print_demon.h"
 
-static const char *receiving_tube;
-static const char *config_file;
+static char *receiving_tube;
+static int fd_t;
+static char *config_file;
 
 static printers_list p_list;
 static int print_id = 1;
 
+void handleSigint(int signo)
+{
+    printf("\n_sig %d_\n", signo);
+    printf("Fermeture du serveur d'impression en cours...\n");
+    close(fd_t);
+    unlink(receiving_tube);
+    exit(EXIT_SUCCESS);
+}
+
+void closeEachPrinter(void)
+{
+    node p;
+    struct printer *c_printer;
+
+    for(p = p_list.head; p != NULL; p = p->next)
+    {
+        c_printer = (struct printer *)(p->data);
+        
+        printf("Fermeture de l'imprimante `%s` en cours...\n", c_printer->name);
+
+        if (c_printer->fd_current_file != -2)
+            close(c_printer->fd_current_file);
+        /* Vider les files d'attentes... */
+
+        if (unlink(c_printer->tube_path) == -1)
+            perror("unlink");
+        close(c_printer->fd_printer);
+    }
+}
+
+    
 void
 add_printer(const char *name, const char *tube)
 {
     int fd;
-    char *buffer_name;
+    char *buffer_name, *buffer_tube;
     size_t name_size;
     struct printer *p;
 
+    fd = open(tube, O_WRONLY | O_NONBLOCK);
+    if (fd == -1)
+        ERROR_EXIT(456789);
+    
     name_size = strlen(name);
 
     p = malloc(sizeof(struct printer));
@@ -35,11 +73,11 @@ add_printer(const char *name, const char *tube)
     buffer_name = malloc(name_size + 1);
     strcpy(buffer_name, name);
 
-    fd = open(tube, O_WRONLY | O_NONBLOCK);
-    if (fd == -1)
-        ERROR_EXIT(456789);
+    buffer_tube = malloc(strlen(tube) + 1);
+    strcpy(buffer_tube, tube);
 
     p->name = buffer_name;
+    p->tube_path = buffer_tube;
     p->fd_printer = fd;
     p->fd_current_file = -2;
 
@@ -96,8 +134,10 @@ init_config_file(void)
             continue;
         }
 
-        (tok++)[0] = '\0';
-        tok[strlen(tok) - 1] = '\0';
+
+        *(tok) = '\0';
+        ++tok;
+        tok[strlen(tok)-1] = '\0';
 
         add_printer(buffer, tok);
     }
@@ -135,9 +175,11 @@ check_if_id_exist(int id, uid_t uid)
 
     for (p_node = p_list.head; p_node != NULL; p_node = p_node->next)
     {
+        printf("FOR EACH PRINTER\n");
         c_printer = (struct printer *)(p_node->data); 
         if (c_printer->id_print == id)
         {
+            printf("\tCANCELING CURRENT PRINTING\n");
             if (c_printer->uid_user != uid)
                 return DONT_HAVE_ACCESS;
 
@@ -149,8 +191,11 @@ check_if_id_exist(int id, uid_t uid)
         {
             w = (struct waiting *)(w_node->data);
 
+            printf("\tFOR EACH WAITING LIST\n");
+
             if (w->id == id)
             {
+                printf("\t\tSAME ID\n");
                 if (w->uid_user != uid)
                     return DONT_HAVE_ACCESS;
 
@@ -168,7 +213,7 @@ check_if_id_exist(int id, uid_t uid)
     return UNKNOWN_ID;
 }
 
-void process_msg(char *buf)
+void process_msg(unsigned int length, char *buf)
 {
     int id;
     char type;
@@ -206,8 +251,6 @@ void process_msg(char *buf)
         memcpy(filename, buf+pos, filename_length + 1);
         pos +=filename_length + 1;
 
-        printf("filename : %s\nprintername : %s\n", filename, printer_name);
-
         if ((answer = try_rights_on_file(uid, gid, filename)) == DONT_HAVE_RIGHTS)
             write_answer(answering_tube, &answer, sizeof(int)); 
         else
@@ -230,9 +273,19 @@ void process_msg(char *buf)
     }
     else if (type == 'l')
     {
-        /* 
-         * LIST
-         */
+        size_t name_length;
+        char *name;
+
+
+        if (pos == length)
+            write_list(answering_tube, NULL);
+        else
+        {
+            name_length = strlen(buf + pos);
+            name =  malloc(name_length * sizeof(char));
+            memcpy(name, buf + pos, name_length + 1);
+            write_list(answering_tube, name);
+        }
     }
     else
         printf("NOT NOW\n");
@@ -252,6 +305,46 @@ write_answer(const char *tube, void *answer, size_t size)
     close(fd);
 }
 
+void
+write_list(const char *tube, const char *name)
+{
+    FILE *f;
+    node p_node, w_node;
+    struct printer *p;
+    struct waiting *w;
+
+    f = fopen(tube, "a");
+    if (f == NULL)
+        unlink(tube);
+
+    for (p_node = p_list.head; p_node != NULL; p_node = p_node->next) 
+    {
+        p = (struct printer *)(p_node->data);
+
+        if (name == NULL || strcmp(name, p->name) == 0)
+        {
+            fprintf(f, "Imprimante `%s` :\n", p->name);
+            
+            if (p->fd_current_file != -2)
+                fprintf(f, "En cours d'impression =>" 
+                        "\n\t[%lu] %s ~ UID : %lu\n",
+                        p->id_print, p->filename, p->uid_user);
+
+            for (w_node = (p->wl).head; w_node != NULL; w_node = w_node->next)
+            {
+                w = (struct waiting *)(w_node->data);
+                
+                fprintf(f, "[%lu] %s ~ UID : %lu\n", 
+                        w->id, w->filename, w->uid_user);
+            }
+
+            fprintf(f, "\n\n");
+        }
+    }
+
+    fclose(f);
+}
+
 void work()
 {
     int fd;
@@ -260,18 +353,18 @@ void work()
     unsigned int msg_length;
     struct node *p;
 
-    fd = open(receiving_tube, O_RDONLY | O_NONBLOCK);
-    if (fd == -1)
+    fd_t = open(receiving_tube, O_RDONLY | O_NONBLOCK);
+    if (fd_t == -1)
         ERROR_EXIT(567890);
 
     while(1)
     {
-        bytes_read = read(fd, &msg_length, sizeof(unsigned int));
+        bytes_read = read(fd_t, &msg_length, sizeof(unsigned int));
         if (bytes_read > 0 && msg_length > 0)
         {
             buffer = malloc(msg_length);
-            read(fd, buffer, msg_length);
-            process_msg(buffer);
+            read(fd_t, buffer, msg_length);
+            process_msg(msg_length, buffer);
             free(buffer);
             msg_length = 0;
         }
@@ -318,8 +411,9 @@ void work()
                         perror("opening...\n");
                         current_printer->fd_current_file = -2;
                     }
-
-                    free(current_data->filename);
+                    
+                    free(current_printer->filename);
+                    current_printer->filename = current_data->filename;
                 }
             }
         }
@@ -332,7 +426,9 @@ void work()
 int 
 main(int argc, char **argv)
 {
-    int receiving_tube_set, config_file_set, cpt;
+    int receiving_tube_set, config_file_set, cpt, return_value;
+    pid_t pid;
+    char *init_sim_impress[4];
 
     if (argc != 5)
         ERROR_MSG(100, "Nombre d'arguments incorrect...\n%s", "");
@@ -368,10 +464,39 @@ main(int argc, char **argv)
 
         ++cpt;
     }
+   
+    signal(SIGINT, handleSigint);
+    atexit(closeEachPrinter);
 
+    init_sim_impress[0] = "./init_simulateurs";
+    init_sim_impress[1] = "-c";
+    init_sim_impress[2] = config_file;
+    init_sim_impress[3] = NULL;
+
+    pid = fork();
+    if (pid == 0)
+    {
+        if (execvp(init_sim_impress[0], init_sim_impress) == -1)
+        {
+            perror("execvp");
+            _exit(EXIT_FAILURE);
+        }
+        _exit(EXIT_SUCCESS);
+    }
     
+    waitpid(pid, &return_value, 0);
+    if (WEXITSTATUS(return_value) != EXIT_SUCCESS)
+    {
+        fprintf(stderr, "STATUS % d\nErreur dans l'initialisation des imprimantes."
+                "\nLe serveur va fermer.\n", WEXITSTATUS(return_value));
+        return EXIT_FAILURE;
+    }
 
-    printf("TUBE : %s\nCONF : %s\n", receiving_tube, config_file);
+    if (create_tube(receiving_tube) == -1)
+        ERROR_EXIT(34567890);
+
+    sleep(1);
+        
 #ifndef DEBUG
     init_config_file();
 #endif

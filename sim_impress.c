@@ -75,6 +75,10 @@ work(void)
 
     if (bytes_read == -1)
         ERROR_EXIT(56789);
+
+    printf("\t\tsubprocess closing files...\n");
+    close(fd_reading);
+    close(fd_writing);
 }
 
 int 

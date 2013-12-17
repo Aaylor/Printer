@@ -24,21 +24,24 @@ create_random_tube_name(char tube[64], char *seed)
     strcpy(tube, "/tmp/tAsw_");
     current_length = strlen(tube);
 
-    while (*seed && left > 23)
+    if (seed != NULL)
     {
-        if (!isalnum(*seed))
+        while (*seed && left > 23)
         {
-            seed += 1;
-            continue;
-        }
+            if (!isalnum(*seed))
+            {
+                seed += 1;
+                continue;
+            }
 
-        if (rand() % 2 == 0)
-            tube[current_length++] = toupper(*seed);
-        else
-            tube[current_length++] = tolower(*seed);
-        seed += 3;
-        tube[current_length] = '\0';
-        --left;
+            if (rand() % 2 == 0)
+                tube[current_length++] = toupper(*seed);
+            else
+                tube[current_length++] = tolower(*seed);
+            seed += 3;
+            tube[current_length] = '\0';
+            --left;
+        }
     }
 
     while (left-- > 1)
@@ -59,7 +62,8 @@ create_message(struct sending_message m)
     size_t pos, length;
     unsigned int msg_length;
 
-    msg_length = sizeof(char) + sizeof(uid_t) + sizeof(gid_t) + sizeof(size_t)
+    printf("%d\n", m.buf_size);
+    msg_length = sizeof(char) + sizeof(uid_t) + sizeof(gid_t)
         + ANSWERING_TUBE_SIZE + m.buf_size;
 
     buf = malloc(msg_length);
@@ -82,8 +86,12 @@ create_message(struct sending_message m)
     memcpy(buf + pos, m.answering_tube, ANSWERING_TUBE_SIZE);
     pos += ANSWERING_TUBE_SIZE;
 
-    memcpy(buf + pos, m.buf, m.buf_size);
-    pos += m.buf_size;
+    if (m.buf_size != 0)
+    {
+        printf("buffer not empty\n");
+        memcpy(buf + pos, m.buf, m.buf_size);
+        pos += m.buf_size;
+    }
 
     return buf;
 }
@@ -123,11 +131,26 @@ get_answer(const char * const answer_tube)
 
     bytes_read = read(fd, &answer, sizeof(int));
     if (bytes_read < sizeof(int))
-        fprintf(stderr, "Warning : nombre de bytes lues inférieures");
+        fprintf(stderr, "Warning : nombre de bytes lu inférieur");
 
     unlink(answer_tube);
     close(fd);
 
     return answer;
+}
+
+void
+print_answer(char answer_tube[ANSWERING_TUBE_SIZE])
+{
+    int fd;
+    size_t bytes_read;
+    char buffer[1024];
+
+    fd = open(answer_tube, O_RDONLY);
+    if (fd == -1)
+        ERROR_EXIT(1244);
+
+    while((bytes_read = read(fd, buffer, 1024)) > 0)
+        write(STDOUT_FILENO, buffer, bytes_read);
 }
 
