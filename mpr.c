@@ -97,16 +97,23 @@ get_listing_message(char *name)
     size_t name_length;
 
     if (name == NULL)
+    {
+        buf = NULL;
         name_length = 0;
+    }
     else
+    {
         name_length = strlen(name) + 1;
+        buf = malloc(name_length * sizeof(char));
+        strcpy(buf, name);
+    }
 
     msg.type = type;
     msg.uid = getuid();
     msg.gid = getgid();
     strcpy(msg.answering_tube, answer_tube);
     msg.buf_size = name_length;
-    msg.buf = name;
+    msg.buf = buf;
 
     returned_message = create_message(msg);
     return returned_message;
