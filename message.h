@@ -26,7 +26,7 @@ create_tube(const char *);
 void *
 create_message(struct sending_message);
 
-void
+int
 send_message(const char * const, const void* const);
 
 int

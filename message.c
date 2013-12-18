@@ -59,13 +59,13 @@ void *
 create_message(struct sending_message m)
 {
     char *buf;
-    size_t pos, length;
+    size_t pos;
     unsigned int msg_length;
 
     msg_length = sizeof(char) + sizeof(uid_t) + sizeof(gid_t)
         + ANSWERING_TUBE_SIZE + m.buf_size;
 
-    buf = malloc(msg_length);
+    buf = malloc(msg_length + sizeof(unsigned int));
     if (buf == NULL)
         ERROR_EXIT(14);
 
@@ -85,7 +85,7 @@ create_message(struct sending_message m)
     memcpy(buf + pos, m.answering_tube, ANSWERING_TUBE_SIZE);
     pos += ANSWERING_TUBE_SIZE;
 
-    if (m.buf_size != 0)
+    if (m.buf_size > 0)
     {
         memcpy(buf + pos, m.buf, m.buf_size);
         pos += m.buf_size;
@@ -94,7 +94,7 @@ create_message(struct sending_message m)
     return buf;
 }
 
-void
+int
 send_message(const char * const tube, const void * const message)
 {
     int fd;
@@ -104,17 +104,12 @@ send_message(const char * const tube, const void * const message)
 
     fd = open(tube, O_WRONLY);
     if (fd == -1)
-        ERROR_EXIT(10);   
-    
+        return 1;
+
     write(fd, message, (size + sizeof(unsigned int)));
     
     close(fd);
-}
-
-void
-free_message(struct sending_message m)
-{
-
+    return 0;
 }
 
 int
@@ -150,5 +145,8 @@ print_answer(char answer_tube[ANSWERING_TUBE_SIZE])
 
     while((bytes_read = read(fd, buffer, 1024)) > 0)
         write(STDOUT_FILENO, buffer, bytes_read);
+
+    unlink(answer_tube);
+    close(fd);
 }
 

@@ -23,6 +23,9 @@ allocate_queue(void);
 void
 free_queue(struct queue);
 
+void
+free_node(struct node *);
+
 int 
 add_in_queue(struct queue *, void *);
 

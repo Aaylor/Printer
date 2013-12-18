@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,9 +32,53 @@ is_number(const char *src)
 char *
 to_abs_ref(char *reference)
 {
-    if (*reference == '/')
-        return reference;
-    return reference;
+    size_t size;
+    char *cwd, *abs_ref, *tmp;
+
+    size = 256;
+    cwd = malloc(size * sizeof(char));
+    if (cwd == NULL)
+    {
+        perror("Erreur lors de l'allocation de cwd ");
+        return NULL;
+    }
+
+    errno = 0;
+    while(getcwd(cwd, size) == NULL && errno == ERANGE)
+    {
+        size *= 2;
+        tmp = realloc(cwd, size);
+        if (tmp == NULL)
+        {
+            free(cwd);
+            perror("Erreur lors de la réallocation de cwd ");
+            return NULL;
+        }
+
+        cwd = tmp;
+    }
+
+    abs_ref = malloc(strlen(reference) + strlen(cwd) + 2);
+    if (abs_ref == NULL)
+    {
+        perror("Erreur lors de l'allocation du chemin absolu ");
+        return NULL;
+    }
+
+    sprintf(abs_ref, "%s/%s", cwd, reference);
+    
+    free(cwd);
+
+    return abs_ref;
+}
+
+void
+get_base_message(struct sending_message *msg)
+{
+    msg->type = type;
+    msg->uid = getuid();
+    msg->gid = getgid();
+    strcpy(msg->answering_tube, answer_tube);
 }
 
 void *
@@ -58,10 +103,7 @@ get_printing_message(const char * const imp_name, const char * const filename)
     memcpy(buf + pos, filename, filename_length);
     pos += filename_length;
 
-    msg.type = type;
-    msg.uid = getuid();
-    msg.gid = getgid();
-    strcpy(msg.answering_tube, answer_tube);
+    get_base_message(&msg);
     msg.buf_size = buf_size;
     msg.buf = buf;
 
@@ -78,14 +120,12 @@ get_canceling_message(int id)
     struct sending_message msg;
     char *returned_message;
 
-    msg.type = type;
-    msg.uid = getuid();
-    msg.gid = getgid();
-    strcpy(msg.answering_tube, answer_tube);
+    get_base_message(&msg);
     msg.buf_size = sizeof(int);
     msg.buf = &id;
 
     returned_message = create_message(msg);
+    
     return returned_message;
 }
 
@@ -93,7 +133,7 @@ void *
 get_listing_message(char *name)
 {
     struct sending_message msg;
-    char *buf, *returned_message;
+    char *returned_message;
     size_t name_length;
 
     if (name == NULL)
@@ -101,10 +141,7 @@ get_listing_message(char *name)
     else
         name_length = strlen(name) + 1;
 
-    msg.type = type;
-    msg.uid = getuid();
-    msg.gid = getgid();
-    strcpy(msg.answering_tube, answer_tube);
+    get_base_message(&msg);
     msg.buf_size = name_length;
     msg.buf = name;
 
@@ -161,13 +198,14 @@ handle_answer(void)
 int 
 main(int argc, char **argv)
 {
-    int cpt, imp_set, file_set;
-    char *imprimante, *file = NULL, *server_tube;
-    char *name;
+    int to_free;
+    char *imprimante, *file, *server_tube, *name;
     void *message;
     struct stat s;
 
     srand(time(NULL));
+    to_free = 0;
+    file = NULL;
 
     if (argc == 1 || argc > 4)
         ERROR_MSG(56789, "Trop d'arguments...\n%s", "");
@@ -179,22 +217,32 @@ main(int argc, char **argv)
     create_random_tube_name(answer_tube, file);
     if (mkfifo(answer_tube, S_IRWXU | S_IRWXG | S_IRWXO) == -1)
         ERROR_EXIT(11);
-   
+
+
     if (strcmp(argv[1], "-P") == 0)
     {
         if (argc != 4)
             ERROR_MSG(4678, "Bad args...\n%s", "");
        
         imprimante = argv[2];
-        file = argv[3];
+        if (*argv[3] == '/')
+            file = argv[3];
+        else
+        {
+            file = to_abs_ref(argv[3]);
+            to_free = 1;
+        }
 
         if (stat(file, &s) == -1)
             ERROR_EXIT(10);
         if (!S_ISREG(s.st_mode))
             ERROR_MSG(11, "Le fichier n'est pas régulier...\n%s", "");
-        
+       
         type = 'i';
         message = get_printing_message(imprimante, file);
+        
+        if (to_free)
+            free(file);
     }
     else if (strcmp(argv[1], "-C") == 0)
     {
@@ -211,17 +259,26 @@ main(int argc, char **argv)
     {
         if (argc == 3)
             name = argv[2];
-        else
+        else if (argc == 2)
             name = NULL;
+        else
+            ERROR_MSG(56789, "Trop d'arguments...\n%s", "");
 
         type = 'l';
         message = get_listing_message(name);
     }
     else
         ERROR_MSG(1234, "ARGUMENT INCONNU.\n%s", "");
+   
+    if (send_message(server_tube, message) == 1)
+    {
+        free(message);
+        fprintf(stderr, "Le message n'a pas pu être envoyé.\n");
+    }
+    free(message);
 
-    send_message(server_tube, message);
     handle_answer();
-
+    
+    
     return EXIT_SUCCESS;
 }

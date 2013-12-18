@@ -22,13 +22,11 @@ allocate_queue(void)
 void
 free_queue(struct queue q)
 {
-
 }
 
 void
 free_node(struct node *n)
 {
-
 }
 
 
@@ -42,6 +40,8 @@ add_in_queue(struct queue *q, void *data)
         return 1;
 
     new->data = data;
+    new->prev = NULL;
+    new->next = NULL;
     
     if (q->head == NULL)
     {

@@ -14,11 +14,11 @@
 #include "message.h"
 #include "print_demon.h"
 
-static char *receiving_tube;
-static int fd_t;
-static char *config_file;
+static char *receiving_tube = NULL;
+static char *config_file = NULL;
+static int fd_t = -1;
 
-static printers_list p_list;
+static printers_list p_list = {.length = 0, .head = NULL, .tail = NULL};
 static int print_id = 1;
 
 void handleSigint(int signo)
@@ -32,22 +32,48 @@ void handleSigint(int signo)
 
 void closeEachPrinter(void)
 {
-    node p;
+    node p, w, tmp_printer, tmp_waiting;
     struct printer *c_printer;
+    struct waiting *w_printer;
 
-    for(p = p_list.head; p != NULL; p = p->next)
+    p = p_list.tail;
+    while(p != NULL)
     {
         c_printer = (struct printer *)(p->data);
         
         printf("Fermeture de l'imprimante `%s` en cours...\n", c_printer->name);
 
+
+        close(c_printer->fd_printer);
+        
         if (c_printer->fd_current_file != -2)
             close(c_printer->fd_current_file);
-        /* Vider les files d'attentes... */
 
         if (unlink(c_printer->tube_path) == -1)
             perror("unlink");
-        close(c_printer->fd_printer);
+
+        free(c_printer->name);
+        free(c_printer->tube_path);
+        free(c_printer->filename);
+
+        w = (c_printer->wl).tail;
+        while (w != NULL)
+        {
+            w_printer = (struct waiting *)(w->data);
+            
+            free(w_printer->filename);
+            free(w_printer);
+            
+            tmp_waiting = w->prev;
+            free(w);
+            w = tmp_waiting;
+        }
+
+        free(c_printer);
+        
+        tmp_printer = p->prev;
+        free(p);
+        p = tmp_printer;
     }
 }
 
@@ -70,16 +96,27 @@ add_printer(const char *name, const char *tube)
     if (p == NULL)
         ERROR_EXIT(456789);
 
+    printf("PRINTER WITH NAME `%s`\n", name);
+
     buffer_name = malloc(name_size + 1);
     strcpy(buffer_name, name);
 
     buffer_tube = malloc(strlen(tube) + 1);
     strcpy(buffer_tube, tube);
 
-    p->name = buffer_name;
-    p->tube_path = buffer_tube;
-    p->fd_printer = fd;
-    p->fd_current_file = -2;
+    p->stopped      = 1;
+    p->fd_printer   = fd;
+    p->name         = buffer_name;
+    p->tube_path    = buffer_tube;
+   
+    p->fd_current_file  = -2;
+    p->id_print         = -1;
+    p->uid_user         = -1;
+    p->filename         = NULL;
+
+    (p->wl).length  = 0;
+    (p->wl).head    = NULL;
+    (p->wl).tail    = NULL;
 
     add_in_printer_list(&p_list, p);
 }
@@ -96,12 +133,15 @@ send_to_printer(const char *printer_name, const char *filename, uid_t uid_user)
         if (strcmp(cur_printer->name, printer_name) == 0)
         {
             w = malloc(sizeof(struct waiting));
+            
             w->filename = malloc(strlen(filename) + 1);
             strcpy(w->filename, filename);
+            
             w->uid_user = uid_user;
             w->id = print_id;
 
             add_in_waiting_list(&(cur_printer->wl), w);
+            
             return print_id++;
         }
 
@@ -261,6 +301,8 @@ void process_msg(unsigned int length, char *buf)
                 write_answer(answering_tube, &answer, sizeof(int));
         }
 
+        free(printer_name);
+        free(filename);
     }
     else if (type == 'c')
     {
@@ -276,7 +318,6 @@ void process_msg(unsigned int length, char *buf)
         size_t name_length;
         char *name;
 
-
         if (pos == length)
             write_list(answering_tube, NULL);
         else
@@ -285,6 +326,8 @@ void process_msg(unsigned int length, char *buf)
             name =  malloc(name_length * sizeof(char));
             memcpy(name, buf + pos, name_length + 1);
             write_list(answering_tube, name);
+
+            free(name);
         }
     }
     else
@@ -323,22 +366,23 @@ write_list(const char *tube, const char *name)
 
         if (name == NULL || strcmp(name, p->name) == 0)
         {
-            fprintf(f, "Imprimante `%s` :\n", p->name);
+            fprintf(f, "=======\nImprimante `%s` :\n", p->name);
             
             if (p->fd_current_file != -2)
-                fprintf(f, "En cours d'impression =>" 
-                        "\n\t[%lu] %s ~ UID : %lu\n",
+                fprintf(f, "\nEn cours d'impression =>" 
+                        "\n[%3d] %s ~ UID : %lu\n",
                         p->id_print, p->filename, p->uid_user);
 
+            fprintf(f, "\nListe d'attente = >");
             for (w_node = (p->wl).head; w_node != NULL; w_node = w_node->next)
             {
                 w = (struct waiting *)(w_node->data);
                 
-                fprintf(f, "[%lu] %s ~ UID : %lu\n", 
+                fprintf(f, "\n[%3d] %20s ~ UID : %lu\n", 
                         w->id, w->filename, w->uid_user);
             }
 
-            fprintf(f, "\n\n");
+            fprintf(f, "======\n\n\n");
         }
     }
 
@@ -357,6 +401,7 @@ void work()
     if (fd_t == -1)
         ERROR_EXIT(567890);
 
+    printf("Le serveur est prêt à l'utilisation.\n");
     while(1)
     {
         bytes_read = read(fd_t, &msg_length, sizeof(unsigned int));
@@ -369,7 +414,6 @@ void work()
             msg_length = 0;
         }
 
-#ifndef DEBUG
         for (p = p_list.head; p != NULL; p = p->next)
         {
             size_t bytes_read_in_file = 0;
@@ -417,7 +461,7 @@ void work()
                 }
             }
         }
-#endif
+        
         sleep(1);
     }
 }
@@ -466,6 +510,7 @@ main(int argc, char **argv)
     }
    
     signal(SIGINT, handleSigint);
+    signal(SIGSEGV, handleSigint);
     atexit(closeEachPrinter);
 
     init_sim_impress[0] = "./init_simulateurs";
@@ -497,9 +542,7 @@ main(int argc, char **argv)
 
     sleep(1);
         
-#ifndef DEBUG
     init_config_file();
-#endif
     work();
 
 

@@ -32,8 +32,8 @@ struct printer
 {
     char stopped;
     int fd_printer;
-    const char *name;
-    const char *tube_path;
+    char *name;
+    char *tube_path;
     
     int fd_current_file;
     int id_print;
