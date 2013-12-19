@@ -55,19 +55,14 @@ work(void)
     total_read = 0;
     while((bytes_read = read(fd_reading, buffer, BUFFER_SIZE)) > 0)
     {
-        printf("bytes_read : %d\n", bytes_read);
-
         if (has_eof(buffer, bytes_read) == 0)
         {
             write(fd_writing, buffer, (bytes_read - 10));
             total_read += (bytes_read - 10);
-            printf("END OF WRITING\n");
             sleep((total_read/10000));
-            printf("END OF SLEEPING\n\n");
         }
         else
         {
-            printf("WRITING\n");
             write(fd_writing, buffer, bytes_read);
             total_read += bytes_read;
         }
@@ -76,7 +71,6 @@ work(void)
     if (bytes_read == -1)
         ERROR_EXIT(56789);
 
-    printf("\t\tsubprocess closing files...\n");
     close(fd_reading);
     close(fd_writing);
 }

@@ -154,9 +154,6 @@ send_to_printer(const char *printer_name, const char *filename, uid_t uid_user)
 int
 init_config_file(void)
 {
-    int fd;
-    struct printer *p;
-
     FILE *cfg;
     char buffer[128];
     char *tok;
@@ -255,7 +252,6 @@ check_if_id_exist(int id, uid_t uid)
 
 void process_msg(unsigned int length, char *buf)
 {
-    int id;
     char type;
     uid_t uid;
     gid_t gid;
@@ -369,9 +365,12 @@ write_list(const char *tube, const char *name)
             fprintf(f, "=======\nImprimante `%s` :\n", p->name);
             
             if (p->fd_current_file != -2)
+            {
                 fprintf(f, "\nEn cours d'impression =>" 
                         "\n[%3d] %s ~ UID : %lu\n",
-                        p->id_print, p->filename, p->uid_user);
+                        p->id_print, p->filename, 
+                        (long unsigned int)p->uid_user);
+            }
 
             fprintf(f, "\nListe d'attente = >");
             for (w_node = (p->wl).head; w_node != NULL; w_node = w_node->next)
@@ -379,7 +378,7 @@ write_list(const char *tube, const char *name)
                 w = (struct waiting *)(w_node->data);
                 
                 fprintf(f, "\n[%3d] %20s ~ UID : %lu\n", 
-                        w->id, w->filename, w->uid_user);
+                        w->id, w->filename, (long unsigned int)w->uid_user);
             }
 
             fprintf(f, "======\n\n\n");
@@ -391,7 +390,6 @@ write_list(const char *tube, const char *name)
 
 void work()
 {
-    int fd;
     char *buffer;
     size_t bytes_read;
     unsigned int msg_length;
@@ -443,8 +441,11 @@ void work()
             {
                 if ((current_printer->wl).length > 0)
                 {
+                    node w;
                     struct waiting *current_data;
-                    current_data = (struct waiting *)(pop(&(current_printer->wl))->data);
+
+                    w = pop(&(current_printer->wl));
+                    current_data = (struct waiting *)(w->data);
 
                     current_printer->stopped = 0;
                     current_printer->uid_user = current_data->uid_user;
@@ -458,6 +459,9 @@ void work()
                     
                     free(current_printer->filename);
                     current_printer->filename = current_data->filename;
+
+                    free(current_data);
+                    free(w);
                 }
             }
         }
