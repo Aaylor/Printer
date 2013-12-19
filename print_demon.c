@@ -43,7 +43,6 @@ void closeEachPrinter(void)
         
         printf("Fermeture de l'imprimante `%s` en cours...\n", c_printer->name);
 
-
         close(c_printer->fd_printer);
         
         if (c_printer->fd_current_file != -2)
@@ -53,14 +52,19 @@ void closeEachPrinter(void)
             perror("unlink");
 
         free(c_printer->name);
+        c_printer->name = NULL;
+
         free(c_printer->tube_path);
+        c_printer->tube_path = NULL;
+
         free(c_printer->filename);
+        c_printer->filename = NULL;
 
         w = (c_printer->wl).tail;
         while (w != NULL)
         {
             w_printer = (struct waiting *)(w->data);
-            
+
             free(w_printer->filename);
             free(w_printer);
             
@@ -70,6 +74,7 @@ void closeEachPrinter(void)
         }
 
         free(c_printer);
+        c_printer = NULL;
         
         tmp_printer = p->prev;
         free(p);
@@ -240,7 +245,12 @@ check_if_id_exist(int id, uid_t uid)
                     return UNKNOWN_ID;
 
                 free(w->filename);
+                w->filename = NULL;
+
                 free(w);
+                w = NULL;
+
+                free(w_node);
 
                 return REMOVED;
             }
@@ -372,16 +382,16 @@ write_list(const char *tube, const char *name)
                         (long unsigned int)p->uid_user);
             }
 
-            fprintf(f, "\nListe d'attente = >");
+            fprintf(f, "\nListe d'attente =>");
             for (w_node = (p->wl).head; w_node != NULL; w_node = w_node->next)
             {
                 w = (struct waiting *)(w_node->data);
                 
-                fprintf(f, "\n[%3d] %20s ~ UID : %lu\n", 
+                fprintf(f, "\n[%3d] %20s ~ UID : %lu", 
                         w->id, w->filename, (long unsigned int)w->uid_user);
             }
 
-            fprintf(f, "======\n\n\n");
+            fprintf(f, "\n======\n\n\n");
         }
     }
 
@@ -445,6 +455,7 @@ void work()
                     struct waiting *current_data;
 
                     w = pop(&(current_printer->wl));
+                    
                     current_data = (struct waiting *)(w->data);
 
                     current_printer->stopped = 0;
@@ -456,17 +467,15 @@ void work()
                         perror("opening...\n");
                         current_printer->fd_current_file = -2;
                     }
-                    
+                
                     free(current_printer->filename);
                     current_printer->filename = current_data->filename;
 
-                    free(current_data);
+                    free(w->data);
                     free(w);
                 }
             }
         }
-        
-        sleep(1);
     }
 }
 
@@ -521,7 +530,7 @@ main(int argc, char **argv)
     init_sim_impress[1] = "-c";
     init_sim_impress[2] = config_file;
     init_sim_impress[3] = NULL;
-
+    
     pid = fork();
     if (pid == 0)
     {
@@ -540,7 +549,7 @@ main(int argc, char **argv)
                 "\nLe serveur va fermer.\n", WEXITSTATUS(return_value));
         return EXIT_FAILURE;
     }
-
+    
     if (create_tube(receiving_tube) == -1)
         ERROR_EXIT(34567890);
 

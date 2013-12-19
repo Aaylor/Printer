@@ -72,7 +72,11 @@ pop(struct queue *q)
    
     if (tmp->next != NULL)
         tmp->next->prev = NULL;
+    
     q->head = tmp->next;
+    if (q->head == NULL)
+        q->tail = NULL;
+    
     q->length--;
 
     return tmp;
@@ -91,17 +95,19 @@ remove_node(struct queue *q, struct node *n)
     {
         if (tmp == n)
         {
-            if (pos == 0)
-            {
+            if (tmp == q->head)
                 q->head = tmp->next;
-                q->length--;
-            }
+
+            if (tmp == q->tail)
+                q->tail = tmp->prev;
 
             if (tmp->prev != NULL)
                 tmp->prev->next = tmp->next;
             if (tmp->next != NULL)
                 tmp->next->prev = tmp->prev;
 
+            q->length--;
+            
             return tmp;
         }
     }
@@ -109,25 +115,3 @@ remove_node(struct queue *q, struct node *n)
     return NULL;
 }
 
-/*
- * TEMP
- */
-void
-print_queue(struct queue q)
-{
-    int i;
-    struct node *tmp;
-
-    if (q.length == 0)
-        printf("QUEUE VIDE\n");
-    else
-    {
-        i = 1;
-        tmp = q.head;
-        while (tmp != NULL)
-        {
-            printf("ELEMENT %d\n", i++);
-            tmp = tmp->next;
-        }
-    }
-}

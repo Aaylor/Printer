@@ -53,6 +53,8 @@ create_processus(const char *file)
             _exit(EXIT_SUCCESS);
         }
     }
+
+    fclose(f);
 }
 
 

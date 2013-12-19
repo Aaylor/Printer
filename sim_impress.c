@@ -59,7 +59,7 @@ work(void)
         {
             write(fd_writing, buffer, (bytes_read - 10));
             total_read += (bytes_read - 10);
-            sleep((total_read/10000));
+            sleep((total_read/100));
         }
         else
         {
@@ -83,32 +83,29 @@ main(int argc, const char **argv)
     if (argc != 5)
         ERROR_MSG(10, "Nombre d'arguments invalide...\n%s", "");
 
+    tube_set = 0;
+    name_set = 0;
     cpt = 1;
     while (cpt < argc)
     {
-        if (strlen(argv[cpt]) == 2 && argv[cpt][0] == '-' && (cpt + 1) < argc) 
+        if (strcmp(argv[cpt], "-t") == 0)
         {
-            if (argv[cpt][1] == 't')
-            {
-               if (tube_set == 1)
-                   ERROR_MSG(123, "Arg -t déjà saisie...\n%s", "");
-               tube_set = 1;
-               
-               infos.tube_name = argv[++cpt];
-            }
-            else if (argv[cpt][1] == 'n')
-            {
-                if (name_set == 1)
-                    ERROR_MSG(124, "Arg -n déjà saisie...\n%s", "");
-                name_set = 1;
+            if (tube_set == 1)
+                ERROR_MSG(56789, "Argument -t déjà saisi...\n%s", "");
 
-                infos.imprimante_name = argv[++cpt];
-            }
-            else
-                ERROR_MSG(1234, "Argument inconnu...\n%s", "");
+            tube_set = 1;
+            infos.tube_name = argv[++cpt];
+        }
+        else if (strcmp(argv[cpt], "-n") == 0)
+        {
+            if (name_set == 1)
+                ERROR_MSG(56789, "Argument -n déhç saisi...\n%s", "");
+
+            name_set = 1;
+            infos.tube_name = argv[++cpt];
         }
         else
-            ERROR_MSG(1323, "Argument invalide...\n%s", "");
+            ERROR_MSG(56789, "Argument invalide...\n%s", "");
 
         ++cpt;
     }
