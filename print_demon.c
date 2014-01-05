@@ -401,7 +401,7 @@ write_list(const char *tube, const char *name)
 void work()
 {
     char *buffer;
-    size_t bytes_read;
+    size_t bytes_read, bytes_written;
     unsigned int msg_length;
     struct node *p;
 
@@ -432,20 +432,34 @@ void work()
            
             if (current_printer->fd_current_file != -2)
             {
-                printf("fd print : %d\n", current_printer->fd_printer);
-                printf("fd cf : %d\n", current_printer->fd_current_file);
                 bytes_read_in_file = read(current_printer->fd_current_file, print_buffer, BUFFER_SIZE);
                 if (bytes_read_in_file == 0 || current_printer->stopped == 1)
                 {
-                    write(current_printer->fd_printer, END_OF_PRINT, 10);
-                    close(current_printer->fd_current_file);
-                    current_printer->uid_user = -1;
-                    current_printer->fd_current_file = -2;
-                    current_printer->id_print = 0;
-                    current_printer->stopped = 0;
+                    if (write(current_printer->fd_printer, END_OF_PRINT, 10) != -1)
+                    {
+                        printf("[%3d] Fin de l'écriture dans `%s`.\n", current_printer->id_print, current_printer->name);
+                        close(current_printer->fd_current_file);
+                        current_printer->uid_user = -1;
+                        current_printer->fd_current_file = -2;
+                        current_printer->id_print = 0;
+                        current_printer->stopped = 0;
+                    }
+                    else
+                    {
+                        printf("[%3d] Attente pour la fin d'écriture dans `%s`.\n", current_printer->id_print, current_printer->name);
+                    }
                 }
                 else
-                    write(current_printer->fd_printer, print_buffer, bytes_read_in_file);
+                {
+                    bytes_written = write(current_printer->fd_printer, print_buffer, bytes_read_in_file);
+                    printf("[%3d] Ecriture dans l'imprimante `%s`.\n", current_printer->id_print, current_printer->name);
+                    
+                    if (bytes_written == -1)
+                    {
+                        printf("[%3d] Retour en arrière.\n", current_printer->id_print);
+                        lseek(current_printer->fd_current_file, bytes_read * (-1), SEEK_CUR);
+                    }
+                }
             }
             else
             {
@@ -523,7 +537,6 @@ main(int argc, char **argv)
     }
    
     signal(SIGINT, handleSigint);
-    signal(SIGSEGV, handleSigint);
     atexit(closeEachPrinter);
 
     init_sim_impress[0] = "./init_simulateurs";

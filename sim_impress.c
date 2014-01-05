@@ -59,7 +59,8 @@ work(void)
         {
             write(fd_writing, buffer, (bytes_read - 10));
             total_read += (bytes_read - 10);
-            sleep((total_read/100));
+            sleep(bytes_read);
+            total_read = 0;
         }
         else
         {
@@ -67,9 +68,6 @@ work(void)
             total_read += bytes_read;
         }
     }
-
-    if (bytes_read == -1)
-        ERROR_EXIT(56789);
 
     close(fd_reading);
     close(fd_writing);
