@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-g -Wall -pedantic -std=c99 -D _POSIX_C_SOURCE=200112L
+CFLAGS=-Wall -pedantic -std=c99 -D _POSIX_C_SOURCE=200112L
 EXEC=
 BIN=
 

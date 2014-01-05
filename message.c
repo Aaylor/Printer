@@ -104,7 +104,7 @@ send_message(const char * const tube, const void * const message)
 
     fd = open(tube, O_WRONLY);
     if (fd == -1)
-        return 1;
+        ERROR_E(10, "Erreur lors de l'ouverture du tube `%s`\n", tube);
 
     write(fd, message, (size + sizeof(unsigned int)));
     
@@ -120,7 +120,7 @@ get_answer(const char * const answer_tube)
 
     fd = open(answer_tube, O_RDONLY);
     if (fd == -1)
-        ERROR_E(11, "Erreur lors de l'ouverture du tube `%s`", answer_tube);
+        ERROR_E(11, "Erreur lors de l'ouverture du tube `%s`\n", answer_tube);
 
     bytes_read = read(fd, &answer, sizeof(int));
     if (bytes_read < sizeof(int))

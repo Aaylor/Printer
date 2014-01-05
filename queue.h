@@ -17,12 +17,21 @@ struct node
     struct node *next;
 };
 
-struct queue * allocate_queue(void);
-
+/*
+ *  Ajoute la donnée dans la file.
+ */
 int add_in_queue(struct queue *q, void *data);
 
+/*
+ *  Retire le premier element de la file.
+ *  Renvoie NULL si aucun élément existe.
+ */
 struct node *pop(struct queue *q);
 
+/*
+ *  Retire l'élement donnée de la file.
+ *  Renvoie NULL si l'élément n'existe pas, renvoie l'élement sinon.
+ */
 struct node *remove_node(struct queue *q, struct node *n);
 
 

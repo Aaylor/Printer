@@ -3,22 +3,6 @@
 
 #include "queue.h"
 
-struct queue *
-allocate_queue(void)
-{
-    struct queue *new_queue;
-
-    new_queue = malloc(sizeof(struct queue));
-    if (new_queue == NULL)
-        return NULL;
-
-    new_queue->length   = 0;
-    new_queue->head     = NULL;
-
-    return new_queue;
-}
-
-
 int
 add_in_queue(struct queue *q, void *data)
 {

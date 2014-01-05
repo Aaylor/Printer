@@ -13,11 +13,31 @@
 #include "message.h"
 #include "print_demon.h"
 
+/*
+ *  Nom du tube de réception, donné en argument.
+ */
 static char *receiving_tube = NULL;
+
+/*
+ *  Nom du fichier de configuration donné en argument.
+ */
 static char *config_file = NULL;
+
+/*  
+ *  Descripteur du tube de reception.
+ */
 static int fd_t = -1;
 
+/*
+ *  Variable qui contiendra la liste des imprimantes, auquels on pourra ajouter
+ *  des demandes d'impressions...
+ */
 static printers_list p_list = {.length = 0, .head = NULL, .tail = NULL};
+
+/*
+ *  Id de la prochaine impression.
+ *  Cette variable est incrémenté après chaque nouvelle impression.
+ */
 static int print_id = 1;
 
 void handleSigint(int signo)
@@ -240,9 +260,6 @@ try_rights_on_file(uid_t uid, gid_t gid, const char *filename)
 int
 check_if_id_exist(int id, uid_t uid)
 {
-    /*
-     * si id > à l'id courant, alors pas la peine de continuer.
-     */
     node p_node, w_node;
     struct printer *c_printer;
     struct waiting *w;

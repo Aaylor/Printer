@@ -13,8 +13,18 @@
 #include "message.h"
 #include "mpr.h"
 
+/*
+ *  Variable contenant le type du message.
+ *  Il est changé lors de la lecture des arguments.
+ */
 static char type;
-static char answer_tube[64];
+
+/*
+ *  Variable contenant le nom du tube de réponse.
+ *  Ce nom est crée aléatoirement, et est ouvert dès la fin de la lecture des
+ *  arguments.
+ */
+static char answer_tube[ANSWERING_TUBE_SIZE];
 
 int
 is_number(const char *src)

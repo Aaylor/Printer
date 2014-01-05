@@ -9,6 +9,9 @@
 #include "error.h"
 #include "sim_impress.h"
 
+/*
+ *  Contient toutes les informations vitales de l'imprimante.
+ */
 struct imprimante_info infos;
 
 void

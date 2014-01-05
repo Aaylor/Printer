@@ -1,0 +1,20 @@
+Runarvot Loïc
+
+Le serveur se lance a l'aide de
+./print_demon -t tube -c config
+Il s'occupe de lancer chacune des imprimantes et d'attendre les messages.
+
+Trois type de message sont possible :
+    * les messages d'impressions, qui permettent de demander au serveur
+    d'imprimer quelque chose.
+        ./mpr -p imprimante fichier
+    * les messages d'annulation d'impressions, qui demande au serveur d'annuler
+    une impression. Celle ci peut être en cours ou en file d'attente.
+        ./mpr -c id_impression
+    * les messages demandant la liste des impressions.
+        ./mpr -L [nom d'imprimante]
+    le nom de l'imprimante n'est pas obligatoire. S'il n'est pas mis, alors
+    affiche la liste pour chacune des imprimantes du serveur.
+
+Le serveur s'occupera d'envoyer sa réponse, qui sera automatiquement gérée par
+le client.
