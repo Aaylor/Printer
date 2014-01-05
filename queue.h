@@ -17,26 +17,14 @@ struct node
     struct node *next;
 };
 
-struct queue *
-allocate_queue(void);
+struct queue * allocate_queue(void);
 
-void
-free_queue(struct queue);
+int add_in_queue(struct queue *q, void *data);
 
-void
-free_node(struct node *);
+struct node *pop(struct queue *q);
 
-int 
-add_in_queue(struct queue *, void *);
+struct node *remove_node(struct queue *q, struct node *n);
 
-struct node *
-pop(struct queue *);
-
-    struct node *
-remove_node(struct queue *q, struct node *n);
-
-void 
-print_queue(struct queue);
 
 #endif /* end of include guard: QUEUE_H */
 

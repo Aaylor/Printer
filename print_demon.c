@@ -9,7 +9,6 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#include "constants.h"
 #include "error.h"
 #include "message.h"
 #include "print_demon.h"
@@ -23,7 +22,6 @@ static int print_id = 1;
 
 void handleSigint(int signo)
 {
-    printf("\n_sig %d_\n", signo);
     printf("Fermeture du serveur d'impression en cours...\n");
     close(fd_t);
     unlink(receiving_tube);
@@ -93,20 +91,34 @@ add_printer(const char *name, const char *tube)
 
     fd = open(tube, O_WRONLY | O_NONBLOCK);
     if (fd == -1)
-        ERROR_EXIT(456789);
+    {
+        ERROR_E(10, "Erreur dans l'ouverture du tube `%s` de "
+                "l'imprimante `%s`\n", tube, name);
+    }
     
     name_size = strlen(name);
 
     p = malloc(sizeof(struct printer));
     if (p == NULL)
-        ERROR_EXIT(456789);
-
-    printf("PRINTER WITH NAME `%s`\n", name);
+    {
+        ERROR_E(11, "Erreur dans l'allocation de la mémoire de la structure "
+                "imprimante `%s`\n", name);
+    }
 
     buffer_name = malloc(name_size + 1);
+    if (buffer_name == NULL)
+    {
+        ERROR_E(11, "Erreur dans l'allocation de la mémoire du nom de "
+                "l'imprimante `%s`\n", name);
+    }
     strcpy(buffer_name, name);
 
     buffer_tube = malloc(strlen(tube) + 1);
+    if (buffer_tube == NULL)
+    {
+        ERROR_E(11, "Erreur dans l'allocation de la mémoire du nom du tube "
+                "de l'imprimante `%s`", name);
+    }
     strcpy(buffer_tube, tube);
 
     p->stopped      = 1;
@@ -123,7 +135,8 @@ add_printer(const char *name, const char *tube)
     (p->wl).head    = NULL;
     (p->wl).tail    = NULL;
 
-    add_in_printer_list(&p_list, p);
+    if (add_in_printer_list(&p_list, p) != 0)
+        perror("Impossible d'ajouter la nouvelle imprimante");
 }
 
 int
@@ -138,14 +151,32 @@ send_to_printer(const char *printer_name, const char *filename, uid_t uid_user)
         if (strcmp(cur_printer->name, printer_name) == 0)
         {
             w = malloc(sizeof(struct waiting));
+            if (w == NULL)
+            {
+                ERROR_E(11, "Erreur dans l'allocation de la mémoire " 
+                        "de la structure d'attente du fichier `%s`, pour "
+                        "l'imprimante `%s`", filename, printer_name);
+            }
             
             w->filename = malloc(strlen(filename) + 1);
+            if (w->filename == NULL)
+            {
+                ERROR_E(11, "Erreur dans l'allocation de la mémoire "
+                        "du nom de fichier, lors de la création de la "
+                        "structure d'attente, pour l'imprimante `%s",
+                        printer_name);
+            
+            }
             strcpy(w->filename, filename);
             
             w->uid_user = uid_user;
             w->id = print_id;
 
-            add_in_waiting_list(&(cur_printer->wl), w);
+            if(add_in_waiting_list(&(cur_printer->wl), w) != 0)
+            {
+                perror("Impossible d'ajouter la demande d'impression.");
+                return ERROR_IN_QUEUE;
+            }
             
             return print_id++;
         }
@@ -165,7 +196,7 @@ init_config_file(void)
 
     cfg = fopen(config_file, "r");
     if (cfg == NULL)
-        ERROR_MSG(10, "Fichier de configuration n'existe pas\n%s", "");
+        ERROR_E(10, "Erreur lors de l'ouverture du fichier de configuration\n");
 
     while(fgets(buffer, 128, cfg) != NULL)
     {
@@ -195,7 +226,8 @@ try_rights_on_file(uid_t uid, gid_t gid, const char *filename)
     struct stat s;
 
     if (stat(filename, &s) == -1)
-        ERROR_EXIT(456789);
+        ERROR_E(30, "Erreur lors de la récupération des stats du fichier `%s`\n",
+                filename);
 
     if ((s.st_mode & S_IROTH) 
             || ((s.st_mode & S_IRGRP) && (s.st_gid == gid))
@@ -217,11 +249,9 @@ check_if_id_exist(int id, uid_t uid)
 
     for (p_node = p_list.head; p_node != NULL; p_node = p_node->next)
     {
-        printf("FOR EACH PRINTER\n");
         c_printer = (struct printer *)(p_node->data); 
         if (c_printer->id_print == id)
         {
-            printf("\tCANCELING CURRENT PRINTING\n");
             if (c_printer->uid_user != uid)
                 return DONT_HAVE_ACCESS;
 
@@ -233,11 +263,8 @@ check_if_id_exist(int id, uid_t uid)
         {
             w = (struct waiting *)(w_node->data);
 
-            printf("\tFOR EACH WAITING LIST\n");
-
             if (w->id == id)
             {
-                printf("\t\tSAME ID\n");
                 if (w->uid_user != uid)
                     return DONT_HAVE_ACCESS;
 
@@ -260,7 +287,8 @@ check_if_id_exist(int id, uid_t uid)
     return UNKNOWN_ID;
 }
 
-void process_msg(unsigned int length, char *buf)
+void 
+process_msg(unsigned int length, char *buf)
 {
     char type;
     uid_t uid;
@@ -289,11 +317,21 @@ void process_msg(unsigned int length, char *buf)
 
         printer_name_length = strlen(buf + pos);
         printer_name = malloc(printer_name_length + 1);
+        if (printer_name == NULL)
+        {
+            ERROR_E(11, "Erreur d'allocation de mémoire lors de la récéption "
+                    "message, pour avoir le nom de l'imprimante.\n");
+        }
         memcpy(printer_name, buf + pos, printer_name_length + 1);
         pos += printer_name_length + 1;
 
         filename_length = strlen(buf + pos);
         filename = malloc(filename_length + 1);
+        if (filename == NULL)
+        {
+            ERROR_E(11, "Erreur d'allocation de mémoire lors de la récéption "
+                    "message, pour avoir le nom du fichier.\n");
+        }
         memcpy(filename, buf+pos, filename_length + 1);
         pos +=filename_length + 1;
 
@@ -330,6 +368,12 @@ void process_msg(unsigned int length, char *buf)
         {
             name_length = strlen(buf + pos);
             name =  malloc(name_length * sizeof(char));
+            if (name == NULL)
+            {
+                ERROR_E(11, "Erreur d'allocation de mémoire lors de la "
+                        "récupération du message, pour avoir le nom de l'"
+                        "imprimante.\n");
+            }
             memcpy(name, buf + pos, name_length + 1);
             write_list(answering_tube, name);
 
@@ -337,7 +381,7 @@ void process_msg(unsigned int length, char *buf)
         }
     }
     else
-        printf("NOT NOW\n");
+        ERROR(404, "Commande inconnue.\n");
 }
 
 void
@@ -347,10 +391,13 @@ write_answer(const char *tube, void *answer, size_t size)
 
     fd = open(tube, O_WRONLY);
     if (fd == -1)
-        ERROR_EXIT(45678);
-
+    {
+        unlink(tube);
+        ERROR_E(10, "Erreur lors de l'ouverture du tube de réponse `%s`.\n",
+                tube);
+    }
+    
     write(fd, answer, size);
-
     close(fd);
 }
 
@@ -364,7 +411,11 @@ write_list(const char *tube, const char *name)
 
     f = fopen(tube, "a");
     if (f == NULL)
+    {
         unlink(tube);
+        ERROR(10, "Erreur lors de l'ouverture du tube de réponse `%s`.\n", 
+                tube);
+    }
 
     for (p_node = p_list.head; p_node != NULL; p_node = p_node->next) 
     {
@@ -391,14 +442,14 @@ write_list(const char *tube, const char *name)
                         w->id, w->filename, (long unsigned int)w->uid_user);
             }
 
-            fprintf(f, "\n======\n\n\n");
+            fprintf(f, "\n=======\n\n\n");
         }
     }
 
     fclose(f);
 }
 
-void work()
+void work(void)
 {
     char *buffer;
     size_t bytes_read, bytes_written;
@@ -407,7 +458,10 @@ void work()
 
     fd_t = open(receiving_tube, O_RDONLY | O_NONBLOCK);
     if (fd_t == -1)
-        ERROR_EXIT(567890);
+    {
+        ERROR_E(10, "Erreur lors de l'ouverture du tube de récéption de "
+                "messages `%s`\n", receiving_tube);
+    }
 
     printf("Le serveur est prêt à l'utilisation.\n");
     while(1)
@@ -416,6 +470,12 @@ void work()
         if (bytes_read > 0 && msg_length > 0)
         {
             buffer = malloc(msg_length);
+            if (buffer == NULL)
+            {
+                ERROR_E(10, "Erreur lors de l'allocation de mémoire du buffer "
+                        "de récéption de messages.\n");
+            }
+
             read(fd_t, buffer, msg_length);
             process_msg(msg_length, buffer);
             free(buffer);
@@ -445,9 +505,7 @@ void work()
                         current_printer->stopped = 0;
                     }
                     else
-                    {
                         printf("[%3d] Attente pour la fin d'écriture dans `%s`.\n", current_printer->id_print, current_printer->name);
-                    }
                 }
                 else
                 {
@@ -478,7 +536,7 @@ void work()
                     current_printer->fd_current_file = open(current_data->filename, O_RDONLY);
                     if (current_printer->fd_current_file == -1)
                     {
-                        perror("opening...\n");
+                        perror("Erreur dans l'ouverture du fichier");
                         current_printer->fd_current_file = -2;
                     }
                 
@@ -502,7 +560,7 @@ main(int argc, char **argv)
     char *init_sim_impress[4];
 
     if (argc != 5)
-        ERROR_MSG(100, "Nombre d'arguments incorrect...\n%s", "");
+        USAGE_ERROR(argv[0], 1, "Nombre d'arguments incorrect.\n");
 
     cpt = 1;
     config_file_set = 0;
@@ -514,7 +572,7 @@ main(int argc, char **argv)
             if (argv[cpt][1] == 't')
             {
                 if (receiving_tube_set == 1)
-                    ERROR_OPT(MORE_THAN_ONCE, argv[cpt][1]);
+                    USAGE_ERROR(argv[0], 4, "Tube définie plusieurs fois.\n");
 
                 receiving_tube_set = 1;
                 receiving_tube = argv[++cpt];
@@ -522,22 +580,32 @@ main(int argc, char **argv)
             else if (argv[cpt][1] == 'c')
             {
                 if (config_file_set == 1)
-                    ERROR_OPT(MORE_THAN_ONCE, argv[cpt][1]);
+                    USAGE_ERROR(argv[0], 4, "Fichier de configuration "
+                            "définie plusieurs fois.\n");
 
                 config_file_set = 1;
                 config_file = argv[++cpt];
             }
             else
-                ERROR_OPT(UNKNOWN_OPTION, argv[cpt][1]);
+                USAGE_ERROR(argv[0], 4, "Argument %s inconnu.\n", argv[cpt]);
         }
         else
-            ERROR_MSG(100, "Arg incorrect\n %s\n", argv[cpt]);
+            USAGE_ERROR(argv[0], 4, "Argument %s incorrect.\n", argv[cpt]);
 
         ++cpt;
     }
    
     signal(SIGINT, handleSigint);
     atexit(closeEachPrinter);
+    
+    if (create_tube(receiving_tube) == -1)
+    {
+        if (errno == EEXIST)
+            ERROR(5, "Le tube de récéption existe déjà. Un serveur est déjà "
+                    "entrain de fonctionner.\n");
+        else
+            ERROR_E(5, "Erreur lors de la création du tube de récéption.\n");
+    }
 
     init_sim_impress[0] = "./init_simulateurs";
     init_sim_impress[1] = "-c";
@@ -558,19 +626,15 @@ main(int argc, char **argv)
     waitpid(pid, &return_value, 0);
     if (WEXITSTATUS(return_value) != EXIT_SUCCESS)
     {
-        fprintf(stderr, "STATUS % d\nErreur dans l'initialisation des imprimantes."
+        fprintf(stderr, "STATUS %d\nErreur dans l'initialisation des imprimantes."
                 "\nLe serveur va fermer.\n", WEXITSTATUS(return_value));
         return EXIT_FAILURE;
     }
-    
-    if (create_tube(receiving_tube) == -1)
-        ERROR_EXIT(34567890);
 
     sleep(1);
-        
+
     init_config_file();
     work();
-
 
     return EXIT_SUCCESS;
 }

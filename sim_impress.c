@@ -7,7 +7,6 @@
 #include <sys/stat.h>
 
 #include "error.h"
-#include "constants.h"
 #include "sim_impress.h"
 
 struct imprimante_info infos;
@@ -16,7 +15,7 @@ void
 create_tube(void)
 {
     if (mkfifo(infos.tube_name, S_IRWXU | S_IRWXG | S_IRWXO) == -1)
-        ERROR_EXIT(12455);
+        ERROR_E(30, "Erreur lors de la création du tube de récéption.\n");
 }
 
 int 
@@ -46,11 +45,12 @@ work(void)
 
     fd_reading = open(infos.tube_name, O_RDONLY);
     if (fd_reading == -1)
-        ERROR_EXIT(124);
+        ERROR_E(10, "Erreur lors de l'ouverture du tube de lecture `%s`.\n",
+                infos.tube_name);
 
     fd_writing = open("/dev/null", O_WRONLY);
     if (fd_writing == -1)
-        ERROR_EXIT(4567);
+        ERROR_E(10, "Erreur lors de l'ouverture de /dev/null.");
 
     total_read = 0;
     while((bytes_read = read(fd_reading, buffer, BUFFER_SIZE)) > 0)
@@ -79,7 +79,7 @@ main(int argc, const char **argv)
     int tube_set, name_set, cpt;
 
     if (argc != 5)
-        ERROR_MSG(10, "Nombre d'arguments invalide...\n%s", "");
+        USAGE_ERROR(argv[0], 10, "Nombre d'arguments invalide...\n");
 
     tube_set = 0;
     name_set = 0;
@@ -89,7 +89,7 @@ main(int argc, const char **argv)
         if (strcmp(argv[cpt], "-t") == 0)
         {
             if (tube_set == 1)
-                ERROR_MSG(56789, "Argument -t déjà saisi...\n%s", "");
+                USAGE_ERROR(argv[0], 10, "Argument -t déjà saisi.\n");
 
             tube_set = 1;
             infos.tube_name = argv[++cpt];
@@ -97,13 +97,13 @@ main(int argc, const char **argv)
         else if (strcmp(argv[cpt], "-n") == 0)
         {
             if (name_set == 1)
-                ERROR_MSG(56789, "Argument -n déhç saisi...\n%s", "");
+                USAGE_ERROR(argv[0], 10, "Argument -n déjà saisi.\n");
 
             name_set = 1;
             infos.tube_name = argv[++cpt];
         }
         else
-            ERROR_MSG(56789, "Argument invalide...\n%s", "");
+            USAGE_ERROR(argv[0], 10, "Argument inconnu.\n");
 
         ++cpt;
     }

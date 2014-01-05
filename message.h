@@ -3,7 +3,7 @@
 
 #include <sys/types.h>
 
-#define ANSWERING_TUBE_SIZE     64
+#define ANSWERING_TUBE_SIZE 64
 #define CONSTANT_SIZE_REQUEST   \
     (sizeof(char) + sizeof(uid_t) + sizeof(gid_t) + ANSWERING_TUBE_SIZE)
 
@@ -17,23 +17,17 @@ struct sending_message
     void *buf;
 };
 
-void
-create_random_tube_name(char[64], char *);
+void create_random_tube_name(char tube[ANSWERING_TUBE_SIZE], char *seed);
 
-int
-create_tube(const char *);
+int create_tube(const char *name);
 
-void *
-create_message(struct sending_message);
+void *create_message(struct sending_message m);
 
-int
-send_message(const char * const, const void* const);
+int send_message(const char * const tube, const void* const message);
 
-int
-get_answer(const char * const);
+int get_answer(const char * const anser_tube);
 
-void
-print_answer(char[ANSWERING_TUBE_SIZE]);
+void print_answer(char[ANSWERING_TUBE_SIZE]);
 
 #endif /* end of include guard: MESSAGE_H */
 

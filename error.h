@@ -6,36 +6,45 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef ERROR_EXIT
-#define ERROR_EXIT(id) \
+/* 
+ *  Macro facilitant les messages d'erreurs.
+ */
+
+#ifndef __ERR
+#define __ERR(...) \
     do { \
-        fprintf(stderr, "\nerror in file `%s`, line %d :\n\t%s\n", \
-                __FILE__, __LINE__, strerror(errno)); \
+        fprintf(stderr, __VA_ARGS__); \
+    } while (0)
+#endif /* __ERR */
+
+#ifndef ERROR
+#define ERROR(id, ...) \
+    do { \
+        __ERR(__VA_ARGS__); \
         if ((id) > 0) exit((id)); \
     } while (0)
-#endif /* endif ERROR_EXIT  */
+#endif /* ERROR */
 
-#ifndef ARG_ERROR_EXIT
-#define ARG_ERROR_EXIT(id, msg) \
+#ifndef ERROR_E
+#define ERROR_E(id, ...) \
     do { \
-        fprintf(stderr, (msg)); \
+        __ERR(__VA_ARGS__); \
+        fprintf(stderr, "%s\n", strerror(errno)); \
         if ((id) > 0) exit((id)); \
     } while (0)
-#endif /* endif ARG_ERROR_EXIT  */
+#endif /* ERROR_E */
 
-#ifndef ERROR_MSG
-#define ERROR_MSG(id, msg, ...) \
-    do { \
-        fprintf(stderr, (msg), __VA_ARGS__); \
-        if ((id) > 0) exit((id)); \
-    } while (0)
-#endif /* endif ERROR_MSG  */
 
+/*
+ *  Enumeration comportant tout les types d'erreurs possible lors des réponses
+ *  du serveur.
+ */
 
 enum printing
 {
     DONT_HAVE_RIGHTS = -1,
     UNKNOWN_PRINTER_NAME = -2, 
+    ERROR_IN_QUEUE = -3,
 };
 
 enum canceling

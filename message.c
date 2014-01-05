@@ -13,7 +13,7 @@
 #include "message.h"
 
 void 
-create_random_tube_name(char tube[64], char *seed)
+create_random_tube_name(char tube[ANSWERING_TUBE_SIZE], char *seed)
 {
     int left;
     size_t current_length;
@@ -67,7 +67,7 @@ create_message(struct sending_message m)
 
     buf = malloc(msg_length + sizeof(unsigned int));
     if (buf == NULL)
-        ERROR_EXIT(14);
+        ERROR_E(10, "Erreur dans l'allocation du buffer lors de la création du message...");
 
     pos = 0;
     memcpy(buf, &msg_length, sizeof(unsigned int));
@@ -120,7 +120,7 @@ get_answer(const char * const answer_tube)
 
     fd = open(answer_tube, O_RDONLY);
     if (fd == -1)
-        ERROR_EXIT(10);
+        ERROR_E(11, "Erreur lors de l'ouverture du tube `%s`", answer_tube);
 
     bytes_read = read(fd, &answer, sizeof(int));
     if (bytes_read < sizeof(int))
@@ -141,7 +141,7 @@ print_answer(char answer_tube[ANSWERING_TUBE_SIZE])
 
     fd = open(answer_tube, O_RDONLY);
     if (fd == -1)
-        ERROR_EXIT(1244);
+        ERROR_E(11, "Erreur lors de l'ouverture du tube `%s`", answer_tube);
 
     while((bytes_read = read(fd, buffer, 1024)) > 0)
         write(STDOUT_FILENO, buffer, bytes_read);

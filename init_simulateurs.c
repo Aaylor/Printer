@@ -7,6 +7,7 @@
 #include <sys/wait.h>
 
 #include "error.h"
+#include "init_simulateurs.h"
 
 void
 create_processus(const char *file)
@@ -19,7 +20,10 @@ create_processus(const char *file)
 
     f = fopen(file, "r");
     if (f == NULL)
+    {
+        perror("Erreur lors de l'ouverture du fichier");
         _exit(EXIT_FAILURE);
+    }
 
     args[0] = "./sim_impress";
     args[1] = "-n";
@@ -62,12 +66,12 @@ int
 main(int argc, const char **argv)
 {
     if (argc != 3)
-        ERROR_EXIT(2356534);
+        ERROR(1, "Nombre d'arguments incorrect.\n");
 
     if (strcmp(argv[1], "-c") != 0)
-        ERROR_EXIT(456789);
+        ERROR(2, "Option inconnue.\n");
 
     create_processus(argv[2]);
-    
-    return EXIT_SUCCESS;
+
+    _exit(EXIT_SUCCESS);    
 }

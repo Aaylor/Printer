@@ -4,24 +4,27 @@
 #include "error.h"
 #include "queue.h"
 
-enum __error_type_print_demon{
-    MORE_THAN_ONCE,
-    ARGUMENT_TOO_LONG,
-    MISSING_ARGUMENT,
-    UNKNOWN_OPTION,
-    UNKNOWN_CHARACTER
-};
-typedef enum __error_type_print_demon daemon_error_t;
+#ifndef USAGE
+#define USAGE(name) \
+    do { \
+        printf("%s -t tube_path -c config_file", name); \
+    } while (0)
+#endif
 
-#define __ERROR_MSG(__error_t) \
-    ((__error_t) == MORE_THAN_ONCE ? "L'argument `%c` existe plus d'une fois.\n" :\
-     ((__error_t) == ARGUMENT_TOO_LONG ? "L'option `%c` possède un argument trop longue.\n" :\
-      ((__error_t) == MISSING_ARGUMENT ? "L'option `%c` manque.\n" : \
-       ((__error_t) == UNKNOWN_OPTION ? "L'option `%c` est inconnue.\n" :\
-        "Caractère d'option non reconnu : `\\x%x`.\n"))))
+#ifndef USAGE_ERROR
+#define USAGE_ERROR(name, id, ...) \
+    do { \
+        ERROR(id, __VA_ARGS__); \
+        USAGE(name); \
+    } while (0)
+#endif
 
-#define ERROR_OPT(__error_t, c) \
-    ERROR_MSG((__error_t), __ERROR_MSG((__error_t)), (c))
+
+#define BUFFER_SIZE 64
+#define END_OF_PRINT "\0\0\0\0\0\0\0\0\0\0"
+
+#define add_in_printer_list(q, d) add_in_queue((q), (d))
+#define add_in_waiting_list(q, d) add_in_queue((q), (d))
 
 typedef struct queue printers_list;
 typedef struct queue waiting_list;
@@ -50,14 +53,29 @@ struct waiting
     int id;
 };
 
-#define add_in_printer_list(q, d) add_in_queue((q), (d))
-#define add_in_waiting_list(q, d) add_in_queue((q), (d))
 
-void
-write_answer(const char *, void *, size_t);
+void handle_sigint(int signo);
 
-void
-write_list(const char *, const char *);
+void close_each_printer(void);
+
+void add_printer(const char *name, const char *tube);
+
+int send_to_printer(const char *printer_name, const char *filename, 
+        uid_t uid_user); 
+
+int init_config_file(void);
+
+int try_rights_on_file(uid_t uid, gid_t gid, const char *filename);
+
+int check_if_id_exist(int id, uid_t uid);
+
+void process_msg(unsigned int length, char *buf);
+
+void write_answer(const char *, void *, size_t);
+
+void write_list(const char *, const char *);
+
+void work(void);
 
 #endif /* endif PRINT_DEMON_H */
 

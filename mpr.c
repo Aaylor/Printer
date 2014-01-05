@@ -94,7 +94,7 @@ get_printing_message(const char * const imp_name, const char * const filename)
 
     buf = malloc(buf_size);
     if (buf == NULL)
-        ERROR_EXIT(11234);
+        ERROR_E(10, "Erreur dans l'allocation de mémoire lors de la récupération du message\n");
 
     pos = 0;
     memcpy(buf + pos, imp_name, imp_length);
@@ -164,6 +164,10 @@ handle_answer(void)
             case UNKNOWN_PRINTER_NAME:
                 fprintf(stderr, "L'imprimante demandée n'existe pas.\n");
                 break;
+            case ERROR_IN_QUEUE:
+                fprintf(stderr, "Erreur lors de l'ajout à la liste " 
+                        "d'impression.\n");
+                break;
             default:
                 printf("La demande a été acceptée.\n"
                         "ID impression : %d\n", answer);
@@ -208,21 +212,21 @@ main(int argc, char **argv)
     file = NULL;
 
     if (argc == 1 || argc > 4)
-        ERROR_MSG(56789, "Trop d'arguments...\n%s", "");
+        USAGE_ERROR(argv[0], 1, "Nombre d'argument incompatible.\n");
 
     server_tube = getenv("IMP_PATH");
     if (server_tube == NULL)
-        ERROR_MSG(12, "IMP_PATH n'existe pas...%s\n", "");
+        ERROR(2, "La variable globale IMP_PATH n'existe pas...\n");
 
     create_random_tube_name(answer_tube, file);
     if (mkfifo(answer_tube, S_IRWXU | S_IRWXG | S_IRWXO) == -1)
-        ERROR_EXIT(11);
+        ERROR_E(20, "Erreur dans la cration du tube de réponse.\n");
 
 
-    if (strcmp(argv[1], "-P") == 0)
+    if (strcmp(argv[1], "-P") == 0 || strcmp(argv[1], "-p") == 0)
     {
         if (argc != 4)
-            ERROR_MSG(4678, "Bad args...\n%s", "");
+            USAGE_ERROR(argv[0], 3, "Nombre d'argument incompatible avec l'option -P.\n");
        
         imprimante = argv[2];
         if (*argv[3] == '/')
@@ -234,9 +238,9 @@ main(int argc, char **argv)
         }
 
         if (stat(file, &s) == -1)
-            ERROR_EXIT(10);
+            ERROR_E(12, "Problème lors de la lecture des stats du fichier.\n");
         if (!S_ISREG(s.st_mode))
-            ERROR_MSG(11, "Le fichier n'est pas régulier...\n%s", "");
+            ERROR(30, "Le fichier n'est pas régulier, et ne peut dont être imprimé.\n");
        
         type = 'i';
         message = get_printing_message(imprimante, file);
@@ -244,31 +248,31 @@ main(int argc, char **argv)
         if (to_free)
             free(file);
     }
-    else if (strcmp(argv[1], "-C") == 0)
+    else if (strcmp(argv[1], "-C") == 0 || strcmp(argv[1], "-c") == 0)
     {
         if (argc != 3)
-            ERROR_MSG(5678, "Bad args...\n%s", "");
+            USAGE_ERROR(argv[0], 3, "Nombre d'argument incompatible avec l'option -C.\n");
 
         if (!is_number(argv[2]))
-            ERROR_MSG(56789, "Argument non entier...\n%s", "");
+            ERROR(31, "L'argument entrée n'est pas un entier.");
 
         type = 'c';
         message = get_canceling_message(atoi(argv[2]));
     }
-    else if (strcmp(argv[1], "-L") == 0)
+    else if (strcmp(argv[1], "-L") == 0 || strcmp(argv[1], "-l") == 0)
     {
         if (argc == 3)
             name = argv[2];
         else if (argc == 2)
             name = NULL;
         else
-            ERROR_MSG(56789, "Trop d'arguments...\n%s", "");
+            USAGE_ERROR(argv[0], 3, "Nombre d'argument incompatible avec l'option -L.\n" );
 
         type = 'l';
         message = get_listing_message(name);
     }
     else
-        ERROR_MSG(1234, "ARGUMENT INCONNU.\n%s", "");
+        USAGE_ERROR(argv[0], 5, "Argument inconnu.");
    
     if (send_message(server_tube, message) == 1)
     {
