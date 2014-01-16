@@ -1,4 +1,8 @@
 PROJET_SY5
 ==========
 
-Implémentation d'interface d'imprimante
+2013-2014 SY5
+By Runarvot Loïc
+
+
+A small printer daemon, and client.
