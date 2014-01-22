@@ -30,7 +30,7 @@ has_eof(char *buffer, size_t buffer_size)
         return 1;
 
     cpt = buffer_size - 1;
-    while(cpt > (buffer_size - EOF_SIZE - 1))
+    while(cpt > (int)(buffer_size - EOF_SIZE - 1))
     {
         if (buffer[cpt--] != '\0')
             return 2;

@@ -40,15 +40,15 @@ static printers_list p_list = {.length = 0, .head = NULL, .tail = NULL};
  */
 static int print_id = 1;
 
-void handleSigint(int signo)
+void handle_sigint(int signo)
 {
-    printf("Fermeture du serveur d'impression en cours...\n");
+    printf("[SIG %3d] Fermeture du serveur d'impression en cours...\n", signo);
     close(fd_t);
     unlink(receiving_tube);
     exit(EXIT_SUCCESS);
 }
 
-void closeEachPrinter(void)
+void close_each_printer(void)
 {
     node p, w, tmp_printer, tmp_waiting;
     struct printer *c_printer;
@@ -529,7 +529,7 @@ void work(void)
                     bytes_written = write(current_printer->fd_printer, print_buffer, bytes_read_in_file);
                     printf("[%3d] Ecriture dans l'imprimante `%s`.\n", current_printer->id_print, current_printer->name);
                     
-                    if (bytes_written == -1)
+                    if (bytes_written == (size_t)-1)
                     {
                         printf("[%3d] Retour en arrière.\n", current_printer->id_print);
                         lseek(current_printer->fd_current_file, bytes_read * (-1), SEEK_CUR);
@@ -612,8 +612,8 @@ main(int argc, char **argv)
         ++cpt;
     }
    
-    signal(SIGINT, handleSigint);
-    atexit(closeEachPrinter);
+    signal(SIGINT, handle_sigint);
+    atexit(close_each_printer);
     
     if (create_tube(receiving_tube) == -1)
     {
