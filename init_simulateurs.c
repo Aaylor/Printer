@@ -45,7 +45,7 @@ create_processus(const char *file)
         pid = fork();
         if (pid == 0)
         {
-            if (fork())
+            if (fork() == 0)
             {
                 if(execvp(args[0], args) == -1)
                 {
